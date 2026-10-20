@@ -18,7 +18,7 @@ import { rollEvent } from './events';
 import { GRID_D, GRID_H, GRID_W, LAYER_M, ci, cx, cy, inBounds, vi } from './geology/types';
 import { dueDiligenceReport, generateListing, refreshMarket } from './market';
 import { getModel } from './estimate';
-import { UNDERGROUND, expandPitSlopes, gramsToOz, mineDay, newMineState, sortStopes, stopeAllowed } from './mining';
+import { MAX_CUTOFF, UNDERGROUND, expandPitSlopes, gramsToOz, mineDay, newMineState, sortStopes, stopeAllowed } from './mining';
 import {
   COSTS,
   bestIntercept,
@@ -457,7 +457,7 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
     case 'setCutoff': {
       const p = prop(s, cmd.propId);
       if (!p) return fail('No such property.');
-      p.mine.cutoff = Math.max(0, Math.min(50, cmd.cutoff));
+      p.mine.cutoff = Math.max(0, Math.min(MAX_CUTOFF, cmd.cutoff));
       return OK;
     }
 

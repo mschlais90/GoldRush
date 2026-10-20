@@ -8,6 +8,8 @@ import type { Rng } from './rng';
 import type { EquipmentUnit, MineState, Property } from './state';
 
 export const BLAST_COST_PER_T = 1.8;
+/** Highest cutoff (g/t) the player may set; in-game breakeven grades sit well below this. */
+export const MAX_CUTOFF = 2.5;
 /** Deeper pits mean longer hauls: slower digging and higher cost per tonne per layer of depth. */
 export const HAUL_SLOWDOWN_PER_LAYER = 0.08;
 export const HAUL_COST_PER_T_PER_LAYER = 0.35;

@@ -217,6 +217,13 @@ input[type='number'] {
 .row.wrap {
   flex-wrap: wrap;
 }
+/* fixed-width readout so a changing value never reflows its row */
+.fixed-num {
+  display: inline-block;
+  min-width: 3.4em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .tag {
   font-size: 10px;
   padding: 1px 5px;
@@ -799,6 +806,27 @@ button.pulse {
 .ug-steps li.done {
   color: var(--pos);
   opacity: 0.75;
+}
+.ug-next {
+  margin: 4px 0 8px;
+}
+.help-btn {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 16px;
+  vertical-align: middle;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  text-transform: none;
+}
+.modal.help p,
+.modal.help li {
+  line-height: 1.45;
 }
 .fc-suggest {
   margin-top: 8px;

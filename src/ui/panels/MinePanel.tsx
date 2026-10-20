@@ -1,11 +1,12 @@
-import { EQUIPMENT, EQUIP_ORDER, LEASE_RATE, resaleValue } from '../../sim/equipment';
+import { EQUIPMENT, EQUIP_CATEGORIES, EQUIP_ORDER, LEASE_RATE, resaleValue } from '../../sim/equipment';
 import { GRAMS_PER_OZ, GRID_H, GRID_W, LAYER_M } from '../../sim/geology/types';
 import { pitForecast } from '../../sim/forecast';
-import { UNDERGROUND, pitBlocksRemaining } from '../../sim/mining';
+import { MAX_CUTOFF, UNDERGROUND, pitBlocksRemaining } from '../../sim/mining';
 import { COSTS } from '../../sim/prospecting';
 import { REGIONS, isWinter } from '../../sim/regions';
 import type { GameState, Property } from '../../sim/state';
 import { money } from '../format';
+import { Help } from '../Help';
 import { store } from '../store';
 import type { Tool } from '../map/MapCanvas';
 import { useState } from 'react';
@@ -64,7 +65,7 @@ export function MinePanel({ s, p, tool, setTool, pitDepth, setPitDepth, stopeRan
           ✏ Paint pit
         </button>
         <label>
-          floor <b>{pitDepth * LAYER_M} m</b>
+          floor <b className="fixed-num">{pitDepth * LAYER_M} m</b>
           <input type="range" min={0} max={24} value={pitDepth} onChange={(e) => setPitDepth(Number(e.target.value))} />
         </label>
         <button className="secondary small-btn" onClick={() => send({ type: 'clearPit', propId: p.id })}>
@@ -76,11 +77,11 @@ export function MinePanel({ s, p, tool, setTool, pitDepth, setPitDepth, stopeRan
       </div>
       <label className="small">
         Cutoff grade <b>{m.cutoff.toFixed(2)} g/t</b>. Blocks below this go to the waste dump.
-        <input type="range" min={0} max={5} step={0.05} value={m.cutoff} onChange={(e) => send({ type: 'setCutoff', propId: p.id, cutoff: Number(e.target.value) })} />
+        <input type="range" min={0} max={MAX_CUTOFF} step={0.05} value={m.cutoff} onChange={(e) => send({ type: 'setCutoff', propId: p.id, cutoff: Number(e.target.value) })} />
       </label>
       <ForecastBox s={s} p={p} />
 
-      <Underground s={s} p={p} tool={tool} setTool={setTool} stopeRange={stopeRange} setStopeRange={setStopeRange} />
+      <Underground p={p} tool={tool} setTool={setTool} stopeRange={stopeRange} setStopeRange={setStopeRange} />
 
       <h4>Equipment on site</h4>
       {p.equipment.length === 0 && <div className="small muted">None yet.</div>}
@@ -96,39 +97,43 @@ export function MinePanel({ s, p, tool, setTool, pitDepth, setPitDepth, stopeRan
         </div>
       ))}
 
-      <h4>Buy / lease</h4>
-      <div className="equip-shop">
-        {EQUIP_ORDER.map((id) => {
-          const e = EQUIPMENT[id];
-          const spec =
-            e.kind === 'dig'
-              ? `${e.capacity} t/d, to ${(e.maxDepth ?? 0) * LAYER_M} m`
-              : e.kind === 'ug'
-                ? `${e.capacity} t/d underground`
-              : e.kind === 'process'
-                ? `${e.capacity} t/d · gravel ${Math.round(e.recovery!.gravel * 100)}% / rock ${Math.round(e.recovery!.rock * 100)}%`
-                : '';
-          const tag = e.kind === 'process' ? (e.recovery!.rock > 0 ? 'gravel + hard rock' : 'gravel only') : e.kind === 'dig' ? 'digging' : e.kind === 'ug' ? 'underground' : '';
-          return (
-            <div key={id} className="shop-row" title={e.desc} data-tut={`shop-${id}`}>
-              <div>
-                <b>{e.name}</b> {tag && <span className={`tag ${tag === 'gravel only' ? 'warn-tag' : ''}`}>{tag}</span>}
-                <div className="small muted">
-                  {spec} {spec && '·'} opex {money(e.opexPerDay)}/d
+      {EQUIP_CATEGORIES.map((cat) => (
+        <div key={cat.name}>
+          <h4>{cat.name}</h4>
+          <div className="equip-shop">
+            {EQUIP_ORDER.filter((id) => cat.kinds.includes(EQUIPMENT[id].kind)).map((id) => {
+              const e = EQUIPMENT[id];
+              const spec =
+                e.kind === 'dig'
+                  ? `${e.capacity} t/d, to ${(e.maxDepth ?? 0) * LAYER_M} m`
+                  : e.kind === 'ug'
+                    ? `${e.capacity} t/d underground`
+                  : e.kind === 'process'
+                    ? `${e.capacity} t/d · gravel ${Math.round(e.recovery!.gravel * 100)}% / rock ${Math.round(e.recovery!.rock * 100)}%`
+                    : '';
+              const tag = e.kind === 'process' ? (e.recovery!.rock > 0 ? 'gravel + hard rock' : 'gravel only') : e.kind === 'ug' ? 'underground' : '';
+              return (
+                <div key={id} className="shop-row" title={e.desc} data-tut={`shop-${id}`}>
+                  <div>
+                    <b>{e.name}</b> {tag && <span className={`tag ${tag === 'gravel only' ? 'warn-tag' : ''}`}>{tag}</span>}
+                    <div className="small muted">
+                      {spec} {spec && '·'} opex {money(e.opexPerDay)}/d
+                    </div>
+                  </div>
+                  <div className="shop-btns">
+                    <button className="small-btn" disabled={s.cash < e.price} onClick={() => send({ type: 'buyEquipment', propId: p.id, equip: id, lease: false })}>
+                      Buy {money(e.price)}
+                    </button>
+                    <button className="secondary small-btn" onClick={() => send({ type: 'buyEquipment', propId: p.id, equip: id, lease: true })}>
+                      Lease {money(e.price * LEASE_RATE)}/d
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="shop-btns">
-                <button className="small-btn" disabled={s.cash < e.price} onClick={() => send({ type: 'buyEquipment', propId: p.id, equip: id, lease: false })}>
-                  Buy {money(e.price)}
-                </button>
-                <button className="secondary small-btn" onClick={() => send({ type: 'buyEquipment', propId: p.id, equip: id, lease: true })}>
-                  Lease {money(e.price * LEASE_RATE)}/d
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -227,13 +232,12 @@ function ForecastBox({ s, p }: { s: GameState; p: Property }) {
 }
 
 function Underground({
-  s,
   p,
   tool,
   setTool,
   stopeRange,
   setStopeRange,
-}: Pick<Props, 's' | 'p' | 'tool' | 'setTool' | 'stopeRange' | 'setStopeRange'>) {
+}: Pick<Props, 'p' | 'tool' | 'setTool' | 'stopeRange' | 'setStopeRange'>) {
   const m = p.mine;
   const sh = m.shaft;
   const send = store.dispatch;
@@ -250,33 +254,59 @@ function Underground({
       done: !!sh && sh.depth > UNDERGROUND.crownPillar && !tooShallow,
       text: tooShallow ? 'Sink the shaft deeper: some stopes sit below its bottom.' : 'Sink the shaft below the ore you want. Crews can only reach levels above the shaft bottom.',
     },
-    { done: hasCrew, text: 'Hire an Underground Mining Crew (Buy / lease, below).' },
+    { done: hasCrew, text: 'Hire an Underground Mining Crew (Digging Equipment, below).' },
     { done: m.stopes.length > 0 || m.ugOreT > 0, text: 'Paint stopes over the ore on the map, choosing a depth range.' },
     { done: hasRockMill, text: 'Have a hard-rock mill (Crusher + Gravity or CIL). Sluices and trommels cannot treat underground ore.' },
   ];
+  const next = steps.findIndex((st) => !st.done);
   return (
     <>
-      <h4>Underground</h4>
-      <div className="small muted">
-        A <b>stope</b> is the room left underground when a block of ore is blasted out. You sink a <b>shaft</b> (a vertical tunnel),
-        drive <b>drifts</b> (horizontal tunnels) over to the ore, and the crew blasts each stope and hoists the ore up the shaft to
-        your mill. Unlike a pit, there is no waste to strip: only the blocks you choose are mined. It costs more per tonne but works
-        through winter.
-      </div>
-      <ol className="ug-steps small">
-        {steps.map((st, i) => (
-          <li key={i} className={st.done ? 'done' : ''}>
-            {st.done ? '✓ ' : ''}
-            {st.text}
-          </li>
-        ))}
-      </ol>
+      <h4>
+        Underground
+        <Help title="Underground mining">
+          <p>
+            A <b>stope</b> is the room left underground when a block of ore is blasted out. You sink a <b>shaft</b> (a vertical tunnel),
+            drive <b>drifts</b> (horizontal tunnels) over to the ore, and the crew blasts each stope and hoists the ore up the shaft to
+            your mill. Unlike a pit, there is no waste to strip: only the blocks you choose are mined. It costs more per tonne but works
+            through winter.
+          </p>
+          <h4>Getting started</h4>
+          <ol className="ug-steps">
+            {steps.map((st, i) => (
+              <li key={i} className={st.done ? 'done' : ''}>
+                {st.done ? '✓ ' : ''}
+                {st.text}
+              </li>
+            ))}
+          </ol>
+          <h4>Tips</h4>
+          <ul>
+            <li>Place the headframe near (not on) the orebody. Every cell of drift from the shaft adds {money(UNDERGROUND.driftCostPerCell)} per block.</li>
+            <li>
+              Painting stopes queues only blocks in the chosen depth range that your estimate puts above cutoff. A {UNDERGROUND.crownPillar * LAYER_M} m
+              crown pillar is left under the pit.
+            </li>
+            <li>Stoping costs {money(UNDERGROUND.costPerT)}/t plus drift costs.</li>
+            <li>
+              <b>Follow the vein</b>: when a stope hits ore, the crew also queues the ground around it.
+            </li>
+          </ul>
+        </Help>
+      </h4>
+      {next >= 0 && (
+        <div className="small ug-next">
+          <b>
+            Step {next + 1}/{steps.length}:
+          </b>{' '}
+          {steps[next].text}
+        </div>
+      )}
       {!sh ? (
         <>
           <button className={`tool-sm ${tool === 'shaft' ? 'active' : ''}`} onClick={() => setTool(tool === 'shaft' ? 'inspect' : 'shaft')}>
             ⛫ Place headframe ({money(UNDERGROUND.collarCost)})
           </button>
-          {tool === 'shaft' && <div className="small muted">Click a cell near (not on) the orebody. Every cell of drift from the shaft adds cost per block.</div>}
+          {tool === 'shaft' && <div className="small muted">Click a cell near (not on) the orebody.</div>}
         </>
       ) : (
         <>
@@ -319,15 +349,10 @@ function Underground({
             To <b>{(to + 1) * LAYER_M} m</b>
             <input type="range" min={0} max={23} value={to} onChange={(e) => setStopeRange([Math.min(from, Number(e.target.value)), Number(e.target.value)])} />
           </label>
-          <div className="small muted">
-            Painting queues blocks in that depth range that your estimate puts above cutoff, leaving a {UNDERGROUND.crownPillar * LAYER_M} m crown pillar
-            under the pit. {money(UNDERGROUND.costPerT)}/t plus {money(UNDERGROUND.driftCostPerCell)} per cell of drift.
-          </div>
-          <label className="row small">
+          <label className="row small" title="When a stope hits ore, also queue the ground around it">
             <input type="checkbox" checked={m.followVein} onChange={(e) => send({ type: 'setFollowVein', propId: p.id, on: e.target.checked })} />
-            Follow the vein: when a stope hits ore, also queue the ground around it
+            Follow the vein
           </label>
-          {s.day >= 0 && !p.equipment.some((e) => e.type === 'ugcrew') && <div className="small neg">Hire an Underground Mining Crew below to start stoping.</div>}
         </>
       )}
     </>

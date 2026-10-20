@@ -152,6 +152,13 @@ export const EQUIP_ORDER: EquipTypeId[] = [
   'vault',
 ];
 
+/** Shop groupings, in display order. */
+export const EQUIP_CATEGORIES: { name: string; kinds: EquipKind[] }[] = [
+  { name: 'Digging Equipment', kinds: ['dig', 'ug'] },
+  { name: 'Processing Equipment', kinds: ['process'] },
+  { name: 'Site Support', kinds: ['pump', 'support'] },
+];
+
 /** Daily lease fee as a fraction of the purchase price. */
 export const LEASE_RATE = 0.003;
 export const RESALE_FRACTION = 0.6;
