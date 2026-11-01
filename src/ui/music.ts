@@ -53,10 +53,13 @@ function el(): HTMLAudioElement {
   return audio;
 }
 
-function play() {
-  if (!settings.enabled) return;
-  // Browsers reject play() until the page has had a user gesture; unlockOnGesture retries then.
-  el().play().catch(() => {});
+/** Resolves true once audio is actually playing; browsers reject play() until the page has had a user gesture. */
+function play(): Promise<boolean> {
+  if (!settings.enabled) return Promise.resolve(false);
+  return el()
+    .play()
+    .then(() => true)
+    .catch(() => false);
 }
 
 function emit() {
@@ -84,16 +87,24 @@ export const music = {
     saveSettings();
     emit();
   },
-  /** Start playback on the first click/keypress, since autoplay with sound is blocked. */
+  /**
+   * Try to autoplay now, and if the browser blocks it, retry on every interaction until playback
+   * really starts. Browsers differ on which events count as a gesture, so listen to all of them.
+   */
   unlockOnGesture() {
-    const start = () => {
-      window.removeEventListener('pointerdown', start);
-      window.removeEventListener('keydown', start);
-      play();
+    const events = ['pointerdown', 'pointerup', 'click', 'keydown', 'touchend'] as const;
+    let done = false;
+    const stop = () => {
+      done = true;
+      for (const ev of events) window.removeEventListener(ev, attempt, true);
     };
-    window.addEventListener('pointerdown', start);
-    window.addEventListener('keydown', start);
-    play();
+    function attempt() {
+      if (done) return;
+      if (audio && !audio.paused) return stop();
+      play().then((ok) => ok && stop());
+    }
+    for (const ev of events) window.addEventListener(ev, attempt, true);
+    attempt();
   },
 };
 
