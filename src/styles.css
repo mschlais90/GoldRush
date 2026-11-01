@@ -620,6 +620,9 @@ table.res td {
 .modal.wide {
   width: min(980px, 95vw);
 }
+.modal.settings {
+  width: min(380px, 92vw);
+}
 .modal-head {
   display: flex;
   justify-content: space-between;

@@ -1,5 +1,6 @@
 import { TitleBackdrop } from './fx';
 import { money } from './format';
+import { SettingsButton } from './Settings';
 import { loadScores, store } from './store';
 
 export function TitleScreen() {
@@ -22,6 +23,7 @@ export function TitleScreen() {
           <button className="secondary" onClick={() => store.newGame('daily')} title="Same world for everyone today">
             Daily challenge
           </button>
+          <SettingsButton className="secondary" label="⚙ Settings" />
         </div>
         {scores.length > 0 && (
           <div className="panel scores-panel">

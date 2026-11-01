@@ -2,6 +2,7 @@ import { netWorth } from '../../sim/economy';
 import type { GameState } from '../../sim/state';
 import { dateLabel, money, oz } from '../format';
 import { useFlash } from '../fx';
+import { SettingsButton } from '../Settings';
 import { store } from '../store';
 
 export function Sparkline({ data, width = 120, height = 28 }: { data: number[]; width?: number; height?: number }) {
@@ -74,6 +75,7 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
         <button data-tut="advance-week" onClick={() => adv(7)} title="W">+1 week</button>
         <button data-tut="advance-month" onClick={() => adv(30)} title="M">+30 days</button>
       </div>
+      <SettingsButton />
       <button className="ghost" onClick={onQuit} title="Save & return to title">☰</button>
     </header>
   );
