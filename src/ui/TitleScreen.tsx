@@ -19,10 +19,7 @@ export function TitleScreen() {
           <button className={hasSave ? 'secondary' : 'pulse'} onClick={() => store.newTutorial()} title="A guided first mine, step by step">
             🎓 Tutorial
           </button>
-          <button onClick={() => store.newGame('standard')}>New game</button>
-          <button className="secondary" onClick={() => store.newGame('daily')} title="Same world for everyone today">
-            Daily challenge
-          </button>
+          <button onClick={() => store.newGame()}>New game</button>
           <SettingsButton className="secondary" label="⚙ Settings" />
         </div>
         {scores.length > 0 && (

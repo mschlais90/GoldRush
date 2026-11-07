@@ -167,3 +167,37 @@ export function CoreLog({ p, hole, revealCount }: { p: Property; hole: Hole; rev
     </div>
   );
 }
+
+/** Every hole on the claim, newest first; click one to open its core log. */
+export function DrillHoleList({ p, selected, onSelect }: { p: Property; selected: number | null; onSelect: (id: number) => void }) {
+  const k = p.knowledge;
+  const holes = [...k.holes].reverse();
+  return (
+    <div className="panel holes-list">
+      <h3>
+        Drill holes <span className="muted small">· {p.name}</span>
+      </h3>
+      {holes.length === 0 && <div className="small muted">No holes drilled on this claim yet. Pick the Drill tool and click the map.</div>}
+      {holes.map((h) => {
+        let summary: string;
+        let best = 0;
+        if (h.status === 'done') {
+          const grades: number[] = [];
+          for (let z = 0; z < h.depth; z++) grades.push(sampleAt(k, vi(cx(h.c), cy(h.c), z)) ?? 0);
+          const bi = bestIntercept(grades);
+          best = bi?.grade ?? 0;
+          summary = bi ? `${bi.metres} m @ ${grade(bi.grade)} from ${bi.from} m` : 'No significant intercepts';
+        } else summary = h.status === 'lab' ? `At the lab · back day ${h.assayDay}` : `Drilling · done day ${h.endDay}`;
+        return (
+          <div key={h.id} className={`hole-item ${h.status} ${selected === h.id ? 'sel' : ''}`} onClick={() => onSelect(h.id)}>
+            <span className="hole-dot" style={{ background: h.status === 'done' ? rgb(gradeColor(best)) : undefined }} />
+            <div>
+              <b>{h.name}</b> <span className="muted small">{columnLabel(h.c)} · {h.depth * LAYER_M} m</span>
+              <div className={`small ${best >= 5 ? 'gold' : ''}`}>{summary}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

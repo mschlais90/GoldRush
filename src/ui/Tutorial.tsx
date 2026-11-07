@@ -198,7 +198,7 @@ const STEPS: Step[] = [
   {
     title: 'Sell your gold',
     body: () =>
-      'Gold in the vault is only worth something when you sell it, and unguarded gold can be stolen. Open the **Bank** tab and click **Sell all gold**. (Holding is a bet on the price.)',
+      'Gold you hold is only worth something when you sell it. Open the **Bank** tab and click **Sell all gold**. (Holding is a bet on the price; you can also turn on auto-sell there.)',
     tab: 'bank',
     target: () => 'sell-gold',
     done: (c) => c.s.stats.ozSold > 0,

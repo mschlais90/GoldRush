@@ -2,7 +2,7 @@
 // sim, persists to localStorage, and notifies React subscribers.
 import { useSyncExternalStore } from 'react';
 import type { Command, CommandResult } from '../sim/commands';
-import { applyCommand, dailySeed, migrateSave, newGame, newTutorialGame } from '../sim/game';
+import { applyCommand, migrateSave, newGame, newTutorialGame } from '../sim/game';
 import { SAVE_VERSION, type GameState } from '../sim/state';
 import { netWorth, annualizedReturn } from '../sim/economy';
 
@@ -50,8 +50,15 @@ export const store = {
   dispatch(cmd: Command): CommandResult {
     if (!state) return { ok: false, error: 'No game' };
     const wasOver = !!state.gameOver;
+    const noticesBefore = state.notices.length ? state.notices[state.notices.length - 1].id : 0;
     const r = applyCommand(state, cmd);
     if (!r.ok && r.error) toast = { text: r.error, kind: 'error', id: version };
+    else if (cmd.type === 'advance') {
+      // no news feed: surface world events (floods, rallies, fines…) as a brief toast
+      const fresh = state.notices.filter((n) => n.id > noticesBefore && !n.popup && n.kind !== 'info');
+      const last = fresh[fresh.length - 1];
+      if (last) toast = { text: `${last.title}: ${last.body}${fresh.length > 1 ? ` (+${fresh.length - 1} more)` : ''}`, kind: 'info', id: version };
+    }
     if (!wasOver && state.gameOver) recordScore(state);
     save();
     emit();
@@ -71,11 +78,9 @@ export const store = {
     save();
     emit();
   },
-  newGame(mode: 'standard' | 'daily') {
-    const today = new Date();
-    const seed = mode === 'daily' ? dailySeed(today) : (Math.random() * 2 ** 31) >>> 0;
-    const label = mode === 'daily' ? `Daily ${today.toISOString().slice(0, 10)}` : `Seed ${seed}`;
-    state = newGame(seed, mode, label);
+  newGame() {
+    const seed = (Math.random() * 2 ** 31) >>> 0;
+    state = newGame(seed, 'standard', `Seed ${seed}`);
     save();
     emit();
   },

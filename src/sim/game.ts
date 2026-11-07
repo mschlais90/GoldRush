@@ -33,7 +33,7 @@ import {
   trenchCells,
 } from './prospecting';
 import { REGIONS, REGION_ORDER } from './regions';
-import { Rng, hashString } from './rng';
+import { Rng } from './rng';
 import {
   GAME_YEARS,
   type GameState,
@@ -59,6 +59,8 @@ export function newGame(seed: number, mode: GameState['mode'] = 'standard', labe
     goldOz: 0,
     goldPrice: 2000,
     priceHistory: [2000],
+    netWorthHistory: [START_CASH],
+    autoSellGold: false,
     loan: 0,
     rng: { s: seed >>> 0 },
     nextId: 1,
@@ -133,13 +135,16 @@ export function migrateSave(s: GameState): GameState | null {
     p.pnl ??= [];
     // old saves stored this pit-only status, which read as if underground crews were missing
     if (p.mine.status === 'No digging equipment') p.mine.status = 'No pit planned';
+    // the gold vault was retired: refund owned vaults at resale value, drop leased ones
+    const vaults = p.equipment.filter((e) => (e.type as string) === 'vault');
+    for (const v of vaults) if (!v.leased) s.cash += 15_000;
+    if (vaults.length) p.equipment = p.equipment.filter((e) => !vaults.includes(e));
   }
+  if ((s.mode as string) === 'daily') s.mode = 'standard';
+  s.autoSellGold ??= false;
+  if (!s.netWorthHistory?.length) s.netWorthHistory = [netWorth(s)];
   s.version = SAVE_VERSION;
   return s;
-}
-
-export function dailySeed(date: Date): number {
-  return hashString(`goldrush-${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}`);
 }
 
 function notify(s: GameState, kind: NoticeKind, title: string, body: string, popup: boolean, extra: Partial<GameState['notices'][0]> = {}) {
@@ -470,6 +475,12 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
       return OK;
     }
 
+    case 'setAutoSell': {
+      s.autoSellGold = cmd.on;
+      if (cmd.on && s.goldOz > 0) applyCommand(s, { type: 'sellGold', oz: s.goldOz });
+      return OK;
+    }
+
     case 'borrow': {
       const room = creditLimit(s) - s.loan;
       if (cmd.amount <= 0) return fail('Invalid amount.');
@@ -683,12 +694,19 @@ export function advanceDay(s: GameState) {
   }
   s.priceHistory.push(Math.round(s.goldPrice * 100) / 100);
 
+  if (s.autoSellGold && s.goldOz > 0) {
+    s.cash += s.goldOz * s.goldPrice;
+    s.stats.ozSold += s.goldOz;
+    s.goldOz = 0;
+  }
+
   if (s.cash < 0 && !coverOverdraft(s)) {
     s.gameOver = { reason: 'Bankrupt! The bank has called in your loans.', netWorth: netWorth(s) };
     return;
   }
 
   const w = netWorth(s);
+  (s.netWorthHistory ??= []).push(Math.round(w));
   s.stats.peakNetWorth = Math.max(s.stats.peakNetWorth, w);
   for (const id of REGION_ORDER) {
     const reg = REGIONS[id];

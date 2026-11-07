@@ -68,20 +68,6 @@ const EVENTS: { weight: number; fn: EventFn }[] = [
     },
   },
   {
-    weight: 2,
-    fn: (s, rng) => {
-      if (s.goldOz < 20) return null;
-      const guarded = s.properties.some((p) => p.equipment.some((e) => e.type === 'vault'));
-      if (guarded) {
-        return { kind: 'info', title: 'Attempted theft foiled', body: 'Thieves tried your gold store, but the vault guards ran them off.' };
-      }
-      const frac = rng.range(0.1, 0.3);
-      const lost = s.goldOz * frac;
-      s.goldOz -= lost;
-      return { kind: 'warn', title: 'Gold stolen!', body: `Thieves made off with ${lost.toFixed(1)} oz of unsold gold. A vault would have stopped them.` };
-    },
-  },
-  {
     weight: 1.5,
     fn: (s, rng) => {
       const mines = activeMines(s);

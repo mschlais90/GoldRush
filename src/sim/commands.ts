@@ -24,6 +24,7 @@ export type Command =
   | { type: 'setFollowVein'; propId: number; on: boolean }
   | { type: 'setCutoff'; propId: number; cutoff: number }
   | { type: 'sellGold'; oz: number }
+  | { type: 'setAutoSell'; on: boolean }
   | { type: 'borrow'; amount: number }
   | { type: 'repay'; amount: number }
   | { type: 'advance'; days: number };

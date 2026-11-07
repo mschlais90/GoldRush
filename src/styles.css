@@ -561,29 +561,40 @@ table.res td {
   gap: 4px;
   min-width: 110px;
 }
-.news {
+.holes-list {
   flex: 1;
   min-height: 200px;
   overflow-y: auto;
 }
-.news-item {
+.hole-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
   padding: 5px 6px;
   border-left: 3px solid var(--line);
   margin-bottom: 5px;
   font-size: 12px;
   cursor: pointer;
+  border-radius: 2px;
 }
-.news-item.good {
-  border-color: var(--pos);
+.hole-item:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
-.news-item.warn {
-  border-color: var(--neg);
-}
-.news-item.assay {
+.hole-item.sel {
   border-color: var(--gold);
+  background: rgba(255, 255, 255, 0.07);
 }
-.news-item.event {
-  border-color: var(--accent);
+.hole-item.drilling,
+.hole-item.lab {
+  opacity: 0.7;
+}
+.hole-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--line);
 }
 .ach {
   font-size: 13px;

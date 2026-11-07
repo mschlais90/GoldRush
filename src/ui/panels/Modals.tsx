@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ACHIEVEMENTS } from '../../sim/achievements';
 import { annualizedReturn, netWorth } from '../../sim/economy';
-import type { GameState, Notice } from '../../sim/state';
+import type { GameState } from '../../sim/state';
 import { money, oz } from '../format';
 import { loadScores, store } from '../store';
 import { CoreLog } from './ExplorePanel';
@@ -110,21 +110,6 @@ export function GameOverModal({ s, onShowTruth }: { s: GameState; onShowTruth: (
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-export function NewsFeed({ s, onSelect }: { s: GameState; onSelect: (n: Notice) => void }) {
-  const items = s.notices.slice(-40).reverse();
-  return (
-    <div className="panel news">
-      <h3>News</h3>
-      {items.map((n) => (
-        <div key={n.id} className={`news-item ${n.kind}`} onClick={() => onSelect(n)}>
-          <span className="muted small">d{n.day}</span> <b>{n.title}</b>
-          {n.kind !== 'assay' && <div className="small">{n.body}</div>}
-        </div>
-      ))}
     </div>
   );
 }

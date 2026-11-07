@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { Clue, GRID_D, LAYER_M, cx, cy } from '../sim/geology/types';
 import { pitBlocksRemaining } from '../sim/mining';
 import { REGIONS } from '../sim/regions';
-import type { Notice } from '../sim/state';
 import { money } from './format';
 import { ClueIcon, MapCanvas, type Overlay, type Tool } from './map/MapCanvas';
-import { CellInfo, CoreLog, ExplorePanel, OVERLAYS } from './panels/ExplorePanel';
+import { CellInfo, CoreLog, DrillHoleList, ExplorePanel, OVERLAYS } from './panels/ExplorePanel';
 import { LandOffice } from './panels/LandOffice';
 import { MinePanel } from './panels/MinePanel';
-import { Achievements, GameOverModal, NewsFeed, NoticeModal } from './panels/Modals';
+import { Achievements, GameOverModal, NoticeModal } from './panels/Modals';
 import { BankPanel, ReportPanel } from './panels/ReportPanel';
 import { TopBar } from './panels/TopBar';
 import { TitleScreen } from './TitleScreen';
@@ -110,14 +109,6 @@ export function App() {
     if (t === 'stope') setOverlay('estimate');
   };
 
-  const onNotice = (n: Notice) => {
-    if (n.propId && s.properties.some((x) => x.id === n.propId)) setPropId(n.propId);
-    if (n.holeId) {
-      setHoleId(n.holeId);
-      setTab('explore');
-    }
-  };
-
   return (
     <div className="app">
       <TopBar s={s} onQuit={() => store.quit()} />
@@ -144,7 +135,16 @@ export function App() {
               🏛 Land Office ({s.listings.length})
             </button>
           </div>
-          <NewsFeed s={s} onSelect={onNotice} />
+          {p && (
+            <DrillHoleList
+              p={p}
+              selected={hole?.id ?? null}
+              onSelect={(id) => {
+                setHoleId(id);
+                setTab('explore');
+              }}
+            />
+          )}
         </aside>
 
         <section className="center">

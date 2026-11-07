@@ -167,7 +167,7 @@ export interface GameStats {
 export interface GameState {
   version: number;
   seed: number;
-  mode: 'standard' | 'daily' | 'tutorial';
+  mode: 'standard' | 'tutorial';
   /** Present in tutorial games: current coach step; `done` once the player finishes or skips it. */
   tutorial?: { step: number; done: boolean };
   label: string;
@@ -178,6 +178,10 @@ export interface GameState {
   goldOz: number;
   goldPrice: number;
   priceHistory: number[];
+  /** Net worth at the end of each day, parallel to priceHistory. */
+  netWorthHistory: number[];
+  /** Sell all newly poured gold at the day's price automatically. */
+  autoSellGold: boolean;
   loan: number;
   rng: RngState;
   nextId: number;

@@ -5,8 +5,8 @@ import { useFlash } from '../fx';
 import { SettingsButton } from '../Settings';
 import { store } from '../store';
 
-export function Sparkline({ data, width = 120, height = 28 }: { data: number[]; width?: number; height?: number }) {
-  const pts = data.slice(-120);
+export function Sparkline({ data, width = 120, height = 28, window = 120, title }: { data: number[]; width?: number; height?: number; window?: number; title?: string }) {
+  const pts = window > 0 ? data.slice(-window) : data;
   if (pts.length < 2) return null;
   const min = Math.min(...pts);
   const max = Math.max(...pts);
@@ -16,6 +16,7 @@ export function Sparkline({ data, width = 120, height = 28 }: { data: number[]; 
   const up = pts[pts.length - 1] >= pts[0];
   return (
     <svg width={width} height={height} className="spark">
+      {title && <title>{title}</title>}
       <polyline points={d} fill="none" stroke={up ? '#7bd88f' : '#ff7b72'} strokeWidth="1.5" />
     </svg>
   );
@@ -62,7 +63,7 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
           ${s.goldPrice.toFixed(0)}/oz <span className={chg >= 0 ? 'pos' : 'neg'}>{chg >= 0 ? '▲' : '▼'}{Math.abs(chg).toFixed(1)}%</span>
         </span>
       </div>
-      <Sparkline data={s.priceHistory} />
+      <Sparkline data={s.priceHistory} title="Gold price, last 120 days" />
       {s.loan > 0 && (
         <div className="stat">
           <span className="lbl">Loan</span>
@@ -70,6 +71,7 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
         </div>
       )}
       <FlashStat label="Net worth" value={w} threshold={100} text={money(w)} cls="gold" big fmt={(d) => money(d)} />
+      <Sparkline data={s.netWorthHistory ?? [w]} window={0} title="Net worth since day 0" />
       <div className="advance">
         <button data-tut="advance-day" onClick={() => adv(1)} title="Space">+1 day</button>
         <button data-tut="advance-week" onClick={() => adv(7)} title="W">+1 week</button>

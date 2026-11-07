@@ -108,12 +108,18 @@ export function BankPanel({ s }: { s: GameState }) {
       <div className="kv">
         <span>Gold price</span>
         <span>${s.goldPrice.toFixed(2)}/oz</span>
-        <span>Gold in vault</span>
+        <span>Gold held</span>
         <span>
           {oz(s.goldOz)} ≈ {money(s.goldOz * s.goldPrice)}
         </span>
       </div>
+      <div className="small muted">Gold price (last 120 days)</div>
       <Sparkline data={s.priceHistory} width={300} height={60} />
+      <div className="small muted">Net worth (whole game)</div>
+      <Sparkline data={s.netWorthHistory ?? []} width={300} height={60} window={0} />
+      <label className="row small" title="Sell every ounce the mill pours at that day's price">
+        <input type="checkbox" checked={!!s.autoSellGold} onChange={(e) => store.dispatch({ type: 'setAutoSell', on: e.target.checked })} /> Auto-sell gold as it's poured
+      </label>
       <div className="row">
         <button data-tut="sell-gold" disabled={s.goldOz <= 0} onClick={() => store.dispatch({ type: 'sellGold', oz: s.goldOz })}>
           Sell all gold
@@ -122,7 +128,7 @@ export function BankPanel({ s }: { s: GameState }) {
           Sell half
         </button>
       </div>
-      <div className="small muted">Hold gold to bet on the price, but unguarded gold attracts thieves.</div>
+      <div className="small muted">Hold gold to bet on the price, or turn on auto-sell to bank it daily.</div>
       <h4>Loans (9% APR)</h4>
       <div className="kv">
         <span>Owed</span>

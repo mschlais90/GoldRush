@@ -216,8 +216,6 @@ export function mineDay(p: Property, t: WorldTruth, day: number, rng: Rng): Mine
   const used = new Set<EquipmentUnit>();
   const has = (kind: string) => p.equipment.some((e) => EQUIPMENT[e.type].kind === kind);
 
-  // Vault is a standing cost.
-  for (const u of p.equipment) if (u.type === 'vault') res.opex += EQUIPMENT.vault.opexPerDay;
 
   if (p.permit !== 'granted') {
     m.status = p.permit === 'pending' ? 'Waiting for mining permit' : 'No mining permit';

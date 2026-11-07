@@ -8,10 +8,9 @@ export type EquipTypeId =
   | 'sluice'
   | 'trommel'
   | 'gravity'
-  | 'cil'
-  | 'vault';
+  | 'cil';
 
-export type EquipKind = 'dig' | 'ug' | 'process' | 'pump' | 'support';
+export type EquipKind = 'dig' | 'ug' | 'process' | 'pump';
 
 export interface EquipType {
   id: EquipTypeId;
@@ -127,15 +126,6 @@ export const EQUIPMENT: Record<EquipTypeId, EquipType> = {
     recovery: { gravel: 0.9, rock: 0.93 },
     desc: 'Industrial cyanide leach plant. Recovers almost everything.',
   },
-  vault: {
-    id: 'vault',
-    name: 'Secure Gold Vault',
-    kind: 'support',
-    price: 25_000,
-    opexPerDay: 60,
-    capacity: 0,
-    desc: 'Guards and a safe. Protects your unsold gold from theft.',
-  },
 };
 
 export const EQUIP_ORDER: EquipTypeId[] = [
@@ -149,14 +139,13 @@ export const EQUIP_ORDER: EquipTypeId[] = [
   'trommel',
   'gravity',
   'cil',
-  'vault',
 ];
 
 /** Shop groupings, in display order. */
 export const EQUIP_CATEGORIES: { name: string; kinds: EquipKind[] }[] = [
   { name: 'Digging Equipment', kinds: ['dig', 'ug'] },
   { name: 'Processing Equipment', kinds: ['process'] },
-  { name: 'Site Support', kinds: ['pump', 'support'] },
+  { name: 'Site Support', kinds: ['pump'] },
 ];
 
 /** Daily lease fee as a fraction of the purchase price. */
