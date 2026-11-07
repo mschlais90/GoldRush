@@ -62,7 +62,9 @@ export function App() {
   if (!s) return <TitleScreen />;
   const tutUi: TutorialUi = { tab, overlay, view, office };
 
-  const p = s.properties.find((x) => x.id === propId) ?? s.properties[0];
+  // once the game is over, sold claims come back so the player can see what was really under them
+  const sold = s.gameOver ? (s.soldProperties ?? []) : [];
+  const p = s.properties.find((x) => x.id === propId) ?? sold.find((x) => x.id === propId) ?? s.properties[0] ?? sold[0];
   const hole = p?.knowledge.holes.find((h) => h.id === holeId) ?? null;
 
   const onCellClick = (c: number) => {
@@ -131,9 +133,28 @@ export function App() {
                 {x.mine.shaft && <div className="small">⛫ Underground: {x.mine.ugStatus}</div>}
               </div>
             ))}
-            <button className="wide-btn" data-tut="land-office" onClick={() => setOffice(true)}>
-              🏛 Land Office ({s.listings.length})
-            </button>
+            {sold.length > 0 && (
+              <>
+                <h4>Sold claims</h4>
+                {sold.map((x) => (
+                  <div key={x.id} className={`prop-card sold ${p?.id === x.id ? 'sel' : ''}`} onClick={() => setPropId(x.id)}>
+                    <b>{x.name}</b>
+                    <div className="small muted">
+                      {REGIONS[x.region].name} · sold day {x.soldDay}
+                    </div>
+                    <div className="small">{x.knowledge.holes.length} holes drilled</div>
+                  </div>
+                ))}
+              </>
+            )}
+            {s.gameOver && (s.properties.length > 0 || sold.length > 0) && (
+              <div className="small muted">Pick any claim, open the 3D view and tick "Show the truth" to see what was really down there.</div>
+            )}
+            {!s.gameOver && (
+              <button className="wide-btn" data-tut="land-office" onClick={() => setOffice(true)}>
+                🏛 Land Office ({s.listings.length})
+              </button>
+            )}
           </div>
           {p && (
             <DrillHoleList

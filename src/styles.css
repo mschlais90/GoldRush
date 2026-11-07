@@ -318,6 +318,10 @@ input[type='number'] {
   cursor: pointer;
   background: var(--panel2);
 }
+.prop-card.sold {
+  opacity: 0.75;
+  border-style: dashed;
+}
 .prop-card.sel {
   border-color: var(--gold);
 }

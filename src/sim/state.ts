@@ -116,6 +116,8 @@ export interface Property {
   ledger: Ledger;
   /** Last 30 days of operating results, newest last. */
   pnl: { day: number; rev: number; cost: number }[];
+  /** Set once the claim has been sold. */
+  soldDay?: number;
 }
 
 export interface ReportedHole {
@@ -186,6 +188,8 @@ export interface GameState {
   rng: RngState;
   nextId: number;
   properties: Property[];
+  /** Claims the player sold, frozen as they were on the day of sale (for the end-of-game reveal). */
+  soldProperties: Property[];
   listings: Listing[];
   unlockedRegions: RegionId[];
   notices: Notice[];

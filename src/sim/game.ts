@@ -65,6 +65,7 @@ export function newGame(seed: number, mode: GameState['mode'] = 'standard', labe
     rng: { s: seed >>> 0 },
     nextId: 1,
     properties: [],
+    soldProperties: [],
     listings: [],
     unlockedRegions: ['motherlode'],
     notices: [],
@@ -143,6 +144,7 @@ export function migrateSave(s: GameState): GameState | null {
   if ((s.mode as string) === 'daily') s.mode = 'standard';
   s.autoSellGold ??= false;
   if (!s.netWorthHistory?.length) s.netWorthHistory = [netWorth(s)];
+  s.soldProperties ??= [];
   s.version = SAVE_VERSION;
   return s;
 }
@@ -239,6 +241,8 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
       const total = price + equip + bondBack;
       s.cash += total;
       s.properties = s.properties.filter((x) => x !== p);
+      p.soldDay = s.day;
+      s.soldProperties.push(p);
       s.stats.propertiesSold++;
       notify(
         s,
