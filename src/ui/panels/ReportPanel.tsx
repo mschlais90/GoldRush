@@ -113,12 +113,12 @@ export function BankPanel({ s }: { s: GameState }) {
           {oz(s.goldOz)} ≈ {money(s.goldOz * s.goldPrice)}
         </span>
       </div>
-      <div className="small muted">Gold price (last 120 days)</div>
+      <div className="small muted">Gold price</div>
       <Sparkline data={s.priceHistory} width={300} height={60} />
-      <div className="small muted">Net worth (whole game)</div>
+      <div className="small muted">Net worth</div>
       <Sparkline data={s.netWorthHistory ?? []} width={300} height={60} window={0} />
       <label className="row small" title="Sell every ounce the mill pours at that day's price">
-        <input type="checkbox" checked={!!s.autoSellGold} onChange={(e) => store.dispatch({ type: 'setAutoSell', on: e.target.checked })} /> Auto-sell gold as it's poured
+        <input type="checkbox" checked={!!s.autoSellGold} onChange={(e) => store.dispatch({ type: 'setAutoSell', on: e.target.checked })} /> Auto-sell gold
       </label>
       <div className="row">
         <button data-tut="sell-gold" disabled={s.goldOz <= 0} onClick={() => store.dispatch({ type: 'sellGold', oz: s.goldOz })}>
