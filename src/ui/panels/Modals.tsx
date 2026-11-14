@@ -99,7 +99,7 @@ export function GameOverModal({ s, onShowTruth }: { s: GameState; onShowTruth: (
         <ol className="scores">
           {scores.slice(0, 8).map((sc, i) => (
             <li key={i}>
-              <b>{money(sc.netWorth)}</b> · {(sc.annual * 100).toFixed(0)}%/yr · {sc.label} · {sc.date}
+              <b>{money(sc.netWorth)}</b> · {(sc.annual * 100).toFixed(0)}%/yr · {sc.label && !sc.label.startsWith('Seed ') && <>{sc.label} · </>}{sc.date}
             </li>
           ))}
         </ol>
