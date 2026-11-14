@@ -14,6 +14,8 @@ import { TitleScreen } from './TitleScreen';
 import { store, useGame, useVersion } from './store';
 import { Reveal3D } from './view3d/Reveal3D';
 import { TutorialCoach, tutorialMarks, type RightTab, type TutorialUi } from './Tutorial';
+import { ConfirmBar } from './panels/ConfirmBar';
+import { useIsMobile, type Pane } from './useIsMobile';
 
 export function App() {
   const s = useGame();
@@ -35,6 +37,9 @@ export function App() {
   const [showShell, setShowShell] = useState(true);
   const [xray, setXray] = useState(true);
   const [showTruth, setShowTruth] = useState(false);
+  const mobile = useIsMobile();
+  const [pane, setPane] = useState<Pane>('map');
+  const [pending, setPending] = useState<number | null>(null);
 
   // keyboard shortcuts for time
   useEffect(() => {
@@ -66,6 +71,12 @@ export function App() {
   const sold = s.gameOver ? (s.soldProperties ?? []) : [];
   const p = s.properties.find((x) => x.id === propId) ?? sold.find((x) => x.id === propId) ?? s.properties[0] ?? sold[0];
   const hole = p?.knowledge.holes.find((h) => h.id === holeId) ?? null;
+
+  const pickClaim = (id: number) => {
+    setPropId(id);
+    setPending(null);
+    if (mobile) setPane('map');
+  };
 
   const onCellClick = (c: number) => {
     if (!p) return;
@@ -107,6 +118,8 @@ export function App() {
   const selectTool = (t: Tool) => {
     setTool(t);
     setTrenchStart(null);
+    setPending(null);
+    if (mobile && t !== 'inspect') setPane('map');
     if (t === 'pit') setOverlay('pit');
     if (t === 'stope') setOverlay('estimate');
   };
@@ -114,13 +127,13 @@ export function App() {
   return (
     <div className="app">
       <TopBar s={s} onQuit={() => store.quit()} />
-      <div className="main">
-        <aside className="left">
+      <div className="main" data-pane={mobile ? pane : undefined}>
+        <aside className="left" data-pane-id="claims">
           <div className="panel">
             <h3>Your claims</h3>
             {s.properties.length === 0 && <div className="small muted">You don't own any land yet.</div>}
             {s.properties.map((x) => (
-              <div key={x.id} className={`prop-card ${p?.id === x.id ? 'sel' : ''}`} onClick={() => setPropId(x.id)}>
+              <div key={x.id} className={`prop-card ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
                 <b>{x.name}</b>
                 <div className="small muted">{REGIONS[x.region].name}</div>
                 <div className="small">
@@ -137,7 +150,7 @@ export function App() {
               <>
                 <h4>Sold claims</h4>
                 {sold.map((x) => (
-                  <div key={x.id} className={`prop-card sold ${p?.id === x.id ? 'sel' : ''}`} onClick={() => setPropId(x.id)}>
+                  <div key={x.id} className={`prop-card sold ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
                     <b>{x.name}</b>
                     <div className="small muted">
                       {REGIONS[x.region].name} · sold day {x.soldDay}
@@ -163,12 +176,13 @@ export function App() {
               onSelect={(id) => {
                 setHoleId(id);
                 setTab('explore');
+                if (mobile) setPane('actions');
               }}
             />
           )}
         </aside>
 
-        <section className="center">
+        <section className="center" data-pane-id="map">
           {p ? (
             <>
               <div className="view-bar">
@@ -226,11 +240,14 @@ export function App() {
                       : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: pitDepth })
                   }
                   onHover={setHover}
+                  onSelect={mobile ? setPending : undefined}
+                  pending={pending}
                   marks={tutorialMarks(s, tutUi)}
                 />
               ) : (
                 <Reveal3D prop={p} version={version} cutoff={p.mine.cutoff} showShell={showShell} xray={xray} showTruth={showTruth && !!s.gameOver} />
               )}
+              {mobile && view === 'map' && <CellInfo p={p} c={hover} slice={slice} />}
               <Legend />
             </>
           ) : (
@@ -252,7 +269,7 @@ export function App() {
           )}
         </section>
 
-        <aside className="right">
+        <aside className="right" data-pane-id="actions">
           {p && (
             <>
               <div className="seg tabs">
@@ -312,7 +329,39 @@ export function App() {
           )}
         />
       )}
-      {s.tutorial && !s.tutorial.done && <TutorialCoach s={s} ui={tutUi} setTab={setTab} setOverlay={setOverlay} />}
+      {mobile && p && pending !== null && (
+        <ConfirmBar
+          cell={pending}
+          tool={tool}
+          trenchStart={trenchStart}
+          drillDepth={drillDepth}
+          rush={rush}
+          onConfirm={() => {
+            onCellClick(pending);
+            setPending(null);
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+      {mobile && (
+        <nav className="mobile-nav">
+          {(
+            [
+              ['claims', '⛏', 'Claims'],
+              ['map', '🗺', 'Map'],
+              ['actions', '🧰', 'Actions'],
+            ] as [Pane, string, string][]
+          ).map(([id, icon, name]) => (
+            <button key={id} className={pane === id ? 'active' : ''} onClick={() => setPane(id)}>
+              <span>{icon}</span>
+              {name}
+            </button>
+          ))}
+        </nav>
+      )}
+      {s.tutorial && !s.tutorial.done && (
+        <TutorialCoach s={s} ui={tutUi} setTab={setTab} setOverlay={setOverlay} setPane={mobile ? setPane : undefined} />
+      )}
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
     </div>
   );

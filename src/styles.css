@@ -984,3 +984,197 @@ button.pulse {
     min-height: 360px;
   }
 }
+
+/* ---------- phone layout (keep in sync with MOBILE_MAX_WIDTH in useIsMobile.ts) ---------- */
+.mobile-nav,
+.confirm-bar {
+  display: none;
+}
+@media (max-width: 760px) {
+  :root {
+    --nav-h: calc(56px + env(safe-area-inset-bottom));
+  }
+  button,
+  input,
+  label,
+  canvas {
+    touch-action: manipulation;
+  }
+  .app {
+    height: 100dvh;
+  }
+
+  /* top bar: essentials only, time controls on their own row */
+  .topbar {
+    gap: 4px 12px;
+    padding: 6px 10px;
+  }
+  .topbar .brand,
+  .topbar .spark,
+  .topbar .gold-price {
+    display: none;
+  }
+  .stat {
+    font-size: 13px;
+  }
+  .stat.big span:nth-child(2) {
+    font-size: 15px;
+  }
+  .advance {
+    order: 10;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .advance button {
+    flex: 1;
+    min-height: 38px;
+  }
+
+  /* one pane at a time */
+  .main {
+    display: block;
+    overflow-y: auto;
+    padding-bottom: var(--nav-h);
+  }
+  .main[data-pane] > [data-pane-id] {
+    display: none;
+  }
+  .main[data-pane='claims'] > [data-pane-id='claims'],
+  .main[data-pane='map'] > [data-pane-id='map'],
+  .main[data-pane='actions'] > [data-pane-id='actions'] {
+    display: flex;
+  }
+  .left,
+  .right,
+  .center {
+    overflow: visible;
+    padding: 8px;
+  }
+  .map-wrap {
+    flex: none;
+    min-height: 0;
+    aspect-ratio: 1;
+  }
+  .map-wrap canvas {
+    touch-action: none;
+  }
+  .view3d {
+    min-height: 60vh;
+  }
+  .slice input {
+    max-width: none;
+    flex: 1;
+  }
+
+  /* bigger tap targets */
+  .seg button,
+  .tool,
+  .tool-sm {
+    min-height: 40px;
+  }
+  .seg.tabs button {
+    padding: 5px 4px;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    display: flex;
+    height: var(--nav-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #12161b;
+    border-top: 1px solid rgba(242, 193, 78, 0.25);
+  }
+  .mobile-nav button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .mobile-nav button span {
+    font-size: 20px;
+  }
+  .mobile-nav button.active {
+    color: var(--gold);
+  }
+
+  .confirm-bar {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--nav-h) + 8px);
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #161b21;
+    border: 1px solid var(--gold);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+  .confirm-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    min-width: 0;
+  }
+  .confirm-bar button {
+    min-height: 40px;
+  }
+
+  /* overlays clear the nav bar */
+  .modal {
+    max-height: 85dvh;
+    padding: 14px;
+  }
+  .modal.wide {
+    width: 100vw;
+    border-radius: 0;
+  }
+  .listings {
+    grid-template-columns: 1fr;
+  }
+  .listing {
+    flex-wrap: wrap;
+  }
+  .coach {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: calc(var(--nav-h) + 8px);
+    max-height: 45dvh;
+    overflow-y: auto;
+  }
+  .coach-pill {
+    left: 8px;
+    bottom: calc(var(--nav-h) + 8px);
+  }
+  .toast {
+    bottom: calc(var(--nav-h) + 12px);
+    max-width: calc(100vw - 24px);
+  }
+
+  /* title screen */
+  .title-content {
+    padding: 0 16px 8vh;
+  }
+  .title-btns {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .scores-panel {
+    width: 100%;
+  }
+}

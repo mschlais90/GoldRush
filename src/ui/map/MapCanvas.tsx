@@ -8,6 +8,7 @@ import { getTruth } from '../../sim/truth';
 import { gradeColor, heatColor } from '../format';
 import { drawClue, drawSparkle } from './sprites';
 import { hash01, streamCurve, strokeCurve, terrainBitmap } from './terrain';
+import { MOBILE_MAX_WIDTH } from '../useIsMobile';
 
 export type Overlay = 'none' | 'soil' | 'geophys' | 'estimate' | 'confidence' | 'pit';
 export type Tool = 'inspect' | 'walkover' | 'pan' | 'soil' | 'trench' | 'drill' | 'pit' | 'shaft' | 'stope';
@@ -26,8 +27,17 @@ interface Props {
   onCellClick: (c: number) => void;
   onPaint: (c: number) => void;
   onHover: (c: number | null) => void;
+  /** Touch only: a tap with a paid tool selects the cell instead of acting, so the player can confirm. */
+  onSelect?: (c: number) => void;
+  /** Touch only: the cell awaiting confirmation (null clears the highlight). */
+  pending?: number | null;
   /** Tutorial beacons: cells to point the player at. */
   marks?: number[];
+}
+
+/** Tools whose tap on touch acts immediately because they cost nothing. */
+function isFreeTap(tool: Tool, trenchStart: number | null): boolean {
+  return tool === 'inspect' || (tool === 'trench' && trenchStart === null);
 }
 
 export function MapCanvas(p: Props) {
@@ -40,12 +50,13 @@ export function MapCanvas(p: Props) {
   const [size, setSize] = useState(640);
   const [, setHover] = useState<number | null>(null);
   const painting = useRef(false);
+  const touchSel = useRef(false);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      const s = Math.max(320, Math.min(el.clientWidth, el.clientHeight || el.clientWidth));
+      const s = Math.max(window.innerWidth <= MOBILE_MAX_WIDTH ? 240 : 320, Math.min(el.clientWidth, el.clientHeight || el.clientWidth));
       setSize(Math.floor(s / GRID_W) * GRID_W);
     });
     ro.observe(el);
@@ -99,7 +110,17 @@ export function MapCanvas(p: Props) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const cellFromEvent = (e: React.MouseEvent) => {
+  // Touch selection cleared by the parent (confirmed or cancelled): drop the highlight.
+  useEffect(() => {
+    if (p.pending == null && touchSel.current) {
+      touchSel.current = false;
+      hoverRef.current = null;
+      setHover(null);
+      paint();
+    }
+  }, [p.pending]);
+
+  const cellFromEvent = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
     const x = Math.floor(((e.clientX - r.left) / r.width) * GRID_W);
     const y = Math.floor(((e.clientY - r.top) / r.height) * GRID_H);
@@ -113,8 +134,13 @@ export function MapCanvas(p: Props) {
         <canvas
           ref={canvasRef}
           style={{ width: size, height: size, cursor: p.tool === 'inspect' ? 'default' : 'crosshair' }}
-          onMouseMove={(e) => {
+          onPointerMove={(e) => {
             const c = cellFromEvent(e);
+            if (e.pointerType !== 'mouse') {
+              // no hover on touch: only a paint drag does anything
+              if (painting.current && c !== null && PAINT_TOOLS.includes(p.tool)) p.onPaint(c);
+              return;
+            }
             if (c !== hoverRef.current) {
               hoverRef.current = c;
               setHover(c);
@@ -123,21 +149,43 @@ export function MapCanvas(p: Props) {
             }
             if (painting.current && c !== null && PAINT_TOOLS.includes(p.tool)) p.onPaint(c);
           }}
-          onMouseLeave={() => {
+          onPointerLeave={(e) => {
+            if (e.pointerType !== 'mouse') return;
             painting.current = false;
             hoverRef.current = null;
             setHover(null);
             p.onHover(null);
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             const c = cellFromEvent(e);
             if (c === null) return;
             if (PAINT_TOOLS.includes(p.tool)) {
               painting.current = true;
+              if (e.pointerType !== 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
               p.onPaint(c);
-            } else p.onCellClick(c);
+              return;
+            }
+            if (e.pointerType === 'mouse' || isFreeTap(p.tool, p.trenchStart) || !p.onSelect) {
+              if (e.pointerType !== 'mouse') {
+                // show the tapped cell's info, since touch has no hover
+                hoverRef.current = c;
+                touchSel.current = true;
+                setHover(c);
+                p.onHover(c);
+                paint();
+              }
+              p.onCellClick(c);
+              return;
+            }
+            hoverRef.current = c;
+            touchSel.current = true;
+            setHover(c);
+            p.onHover(c);
+            p.onSelect(c);
+            paint();
           }}
-          onMouseUp={() => (painting.current = false)}
+          onPointerUp={() => (painting.current = false)}
+          onPointerCancel={() => (painting.current = false)}
         />
       </div>
     </div>

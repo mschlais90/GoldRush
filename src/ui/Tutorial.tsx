@@ -1,5 +1,5 @@
 // Tutorial coach: a step list with highlight targets, map beacons and completion checks.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { endTutorial } from '../sim/game';
 import { pitForecast } from '../sim/forecast';
 import { Clue, LAYER_M } from '../sim/geology/types';
@@ -8,6 +8,7 @@ import type { GameState, Property } from '../sim/state';
 import { suggestedPitCells, tutorialPlan, type TutorialPlan } from '../sim/tutorial';
 import type { Overlay } from './map/MapCanvas';
 import { store } from './store';
+import type { Pane } from './useIsMobile';
 
 export type RightTab = 'explore' | 'mine' | 'report' | 'bank' | 'awards';
 
@@ -249,11 +250,14 @@ export function TutorialCoach({
   ui,
   setTab,
   setOverlay,
+  setPane,
 }: {
   s: GameState;
   ui: TutorialUi;
   setTab: (t: RightTab) => void;
   setOverlay: (o: Overlay) => void;
+  /** Phone layout only: switch the visible pane. */
+  setPane?: (p: Pane) => void;
 }) {
   const ctx = useCtx(s, ui);
   const [collapsed, setCollapsed] = useState(false);
@@ -281,9 +285,16 @@ export function TutorialCoach({
 
   // highlight the element the player should use
   const target = step.target?.(ctx);
+  const shownTarget = useRef<string | null>(null);
   useEffect(() => {
     if (!target) return;
     const els = [...document.querySelectorAll(`[data-tut="${target}"]`)];
+    // Phone: bring the target's pane on screen, once per target so the player can still navigate away.
+    if (setPane && shownTarget.current !== target) {
+      shownTarget.current = target;
+      const pane = els[0]?.closest('[data-pane-id]')?.getAttribute('data-pane-id');
+      if (pane) setPane(pane as Pane);
+    }
     els.forEach((e) => e.classList.add('tut-glow'));
     if (els[0] && 'scrollIntoView' in els[0]) (els[0] as HTMLElement).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return () => els.forEach((e) => e.classList.remove('tut-glow'));

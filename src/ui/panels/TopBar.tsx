@@ -57,7 +57,7 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
       </div>
       <FlashStat label="Cash" value={s.cash} threshold={1} text={money(s.cash)} cls={s.cash < 20000 ? 'neg' : ''} fmt={(d) => money(d)} />
       <FlashStat label="Gold held" value={s.goldOz} threshold={0.05} text={oz(s.goldOz)} fmt={(d) => `${d.toFixed(1)} oz`} />
-      <div className="stat">
+      <div className="stat gold-price">
         <span className="lbl">Gold price</span>
         <span>
           ${s.goldPrice.toFixed(0)}/oz <span className={chg >= 0 ? 'pos' : 'neg'}>{chg >= 0 ? '▲' : '▼'}{Math.abs(chg).toFixed(1)}%</span>
