@@ -9,6 +9,7 @@ import { cx, cy, vi } from '../../sim/geology/types';
 import { columnLabel } from '../../sim/market';
 import { grade } from '../format';
 import { GoldBurst } from '../fx';
+import { HallOfFame } from '../HallOfFame';
 
 /** Pops the oldest unseen popup notice. Assay results reveal row-by-row for suspense. */
 export function NoticeModal({ s }: { s: GameState }) {
@@ -96,13 +97,7 @@ export function GameOverModal({ s, onShowTruth }: { s: GameState; onShowTruth: (
           </span>
         </div>
         <h4>Hall of fame</h4>
-        <ol className="scores">
-          {scores.slice(0, 8).map((sc, i) => (
-            <li key={i}>
-              <b>{money(sc.netWorth)}</b> · {(sc.annual * 100).toFixed(0)}%/yr · {sc.label && !sc.label.startsWith('Seed ') && <>{sc.label} · </>}{sc.date}
-            </li>
-          ))}
-        </ol>
+        <HallOfFame scores={scores} />
         <div className="row">
           <button onClick={onShowTruth}>Reveal what was really down there</button>
           <button className="secondary" onClick={() => store.quit()}>

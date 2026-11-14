@@ -1,5 +1,5 @@
 import { TitleBackdrop } from './fx';
-import { money } from './format';
+import { HallOfFame } from './HallOfFame';
 import { SettingsButton } from './Settings';
 import { loadScores, store } from './store';
 
@@ -25,13 +25,7 @@ export function TitleScreen() {
         {scores.length > 0 && (
           <div className="panel scores-panel">
             <h3>Hall of fame</h3>
-            <ol className="scores">
-              {scores.slice(0, 8).map((sc, i) => (
-                <li key={i}>
-                  <b>{money(sc.netWorth)}</b> · {(sc.annual * 100).toFixed(0)}%/yr · {sc.label && !sc.label.startsWith('Seed ') && <>{sc.label} · </>}{sc.date}
-                </li>
-              ))}
-            </ol>
+            <HallOfFame scores={scores} />
           </div>
         )}
       </div>

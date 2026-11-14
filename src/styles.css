@@ -947,8 +947,29 @@ button.pulse {
 }
 .scores {
   font-size: 13px;
-  padding-left: 20px;
-  margin: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.scores th,
+.scores td {
+  text-align: left;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.scores th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+}
+.scores .num {
+  text-align: right;
+}
+.scores tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
 }
 .welcome {
   max-width: 560px;
