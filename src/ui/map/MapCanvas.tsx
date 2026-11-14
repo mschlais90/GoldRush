@@ -14,6 +14,8 @@ export type Overlay = 'none' | 'soil' | 'geophys' | 'estimate' | 'confidence' | 
 export type Tool = 'inspect' | 'walkover' | 'pan' | 'soil' | 'trench' | 'drill' | 'pit' | 'shaft' | 'stope';
 
 const PAINT_TOOLS: Tool[] = ['pit', 'stope'];
+/** Closest zoom: the whole claim (z = 1) is always the furthest out. */
+const MAX_ZOOM = 4;
 const N = GRID_W * GRID_H;
 
 interface Props {
@@ -52,6 +54,69 @@ export function MapCanvas(p: Props) {
   const painting = useRef(false);
   const touchSel = useRef(false);
 
+  // Zoom: z = 1 is the whole claim (the furthest out you can go). ox/oy = top-left of the
+  // visible window as a fraction of the map, so the view survives resizes.
+  const [view, setView] = useState({ z: 1, ox: 0, oy: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  // Backing-store zoom: the canvas is re-rendered at this zoom once a gesture settles; between
+  // renders the browser scales the bitmap, which keeps pinch/wheel smooth.
+  const [rz, setRz] = useState(1);
+  useEffect(() => {
+    const id = setTimeout(() => setRz(view.z), 120);
+    return () => clearTimeout(id);
+  }, [view.z]);
+  const dprNow = window.devicePixelRatio || 1;
+  // stay under mobile canvas size limits (~4096 px per side)
+  const maxZ = Math.max(1, Math.min(MAX_ZOOM, 4096 / (size * dprNow)));
+
+  /** Clamp and apply a view; updates the ref immediately so several moves in one event compose. */
+  const clampView = (z: number, ox: number, oy: number) => {
+    const zz = Math.max(1, Math.min(maxZ, z));
+    const lim = 1 - 1 / zz;
+    const v = { z: zz, ox: Math.max(0, Math.min(lim, ox)), oy: Math.max(0, Math.min(lim, oy)) };
+    viewRef.current = v;
+    return v;
+  };
+  /** Zoom to `nz`, keeping the map point under frame position (fx, fy) in place. */
+  const zoomAt = (fx: number, fy: number, nz: number) => {
+    const v = viewRef.current;
+    const u = fx / size / v.z + v.ox;
+    const w = fy / size / v.z + v.oy;
+    const z = Math.max(1, Math.min(maxZ, nz));
+    setView(clampView(z, u - fx / size / z, w - fy / size / z));
+  };
+  const panBy = (dx: number, dy: number) => {
+    const v = viewRef.current;
+    setView(clampView(v.z, v.ox - dx / (size * v.z), v.oy - dy / (size * v.z)));
+  };
+  const zoomAtRef = useRef(zoomAt);
+  zoomAtRef.current = zoomAt;
+
+  // A different claim starts fully zoomed out.
+  useEffect(() => setView(clampView(1, 0, 0)), [p.prop.id]);
+
+  // Gesture state: active pointers, pinch baseline, drag-pan and tap tracking.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; z: number; mx: number; my: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; panning: boolean } | null>(null);
+  const tap = useRef<{ x: number; y: number; c: number } | null>(null);
+
+  // Mouse wheel zooms around the cursor (non-passive so the page doesn't scroll instead).
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const onWheel = (e: WheelEvent) => {
+      const v = viewRef.current;
+      if (v.z <= 1 && e.deltaY > 0) return; // already fully out: let the page scroll
+      e.preventDefault();
+      const r = cv.parentElement!.getBoundingClientRect();
+      zoomAtRef.current(e.clientX - r.left, e.clientY - r.top, v.z * Math.exp(-e.deltaY * 0.0015));
+    };
+    cv.addEventListener('wheel', onWheel, { passive: false });
+    return () => cv.removeEventListener('wheel', onWheel);
+  }, []);
+
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -64,25 +129,29 @@ export function MapCanvas(p: Props) {
   }, []);
 
   // Rebuild the static layer whenever game data or view options change.
+  // The map is drawn at `drawSize` CSS px (size × render zoom); at rz = 1 this is exactly the old rendering.
+  const renderZ = Math.min(rz, maxZ);
+  const drawSize = size * renderZ;
   useEffect(() => {
     const dpr = window.devicePixelRatio || 1;
-    const px = Math.round(size * dpr);
+    const px = Math.round(drawSize * dpr);
     const cv = staticRef.current ?? document.createElement('canvas');
     cv.width = px;
     cv.height = px;
     const ctx = cv.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawStatic(ctx, size / GRID_W, p, 800);
+    // finer terrain texture once zoomed in (cached per resolution)
+    drawStatic(ctx, drawSize / GRID_W, p, renderZ > 1.5 ? 1600 : 800);
     staticRef.current = cv;
     paint();
-  }, [p.prop, p.version, p.overlay, p.slice, p.selectedHole, size]);
+  }, [p.prop, p.version, p.overlay, p.slice, p.selectedHole, size, drawSize]);
 
   /** Blit the static layer, then water, sparkles and tool previews. */
   function paint(now = performance.now()) {
     const cv = canvasRef.current;
     if (!cv || !staticRef.current) return;
     const dpr = window.devicePixelRatio || 1;
-    const px = Math.round(size * dpr);
+    const px = Math.round(drawSize * dpr);
     if (cv.width !== px) {
       cv.width = px;
       cv.height = px;
@@ -91,7 +160,7 @@ export function MapCanvas(p: Props) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(staticRef.current, 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawDynamic(ctx, size / GRID_W, propsRef.current, hoverRef.current, now / 1000);
+    drawDynamic(ctx, drawSize / GRID_W, propsRef.current, hoverRef.current, now / 1000);
   }
   const paintRef = useRef(paint);
   paintRef.current = paint;
@@ -128,18 +197,89 @@ export function MapCanvas(p: Props) {
     return ci(x, y);
   };
 
+  /** A completed touch tap (finger lifted without dragging): the original touch tap behaviour. */
+  const touchTap = (c: number) => {
+    hoverRef.current = c;
+    touchSel.current = true;
+    setHover(c);
+    p.onHover(c);
+    if (isFreeTap(p.tool, p.trenchStart) || !p.onSelect) p.onCellClick(c);
+    else p.onSelect(c);
+    paint();
+  };
+
+  const framePoint = (e: { clientX: number; clientY: number }) => {
+    const r = canvasRef.current!.parentElement!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  const endPointer = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    painting.current = false;
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 0) drag.current = null;
+  };
+
+  const cssZ = view.z;
   return (
     <div className="map-wrap" ref={wrapRef}>
-      <div className="map-frame" style={{ width: size, height: size }}>
+      <div className="map-frame" style={{ width: size, height: size, position: 'relative' }}>
         <canvas
           ref={canvasRef}
-          style={{ width: size, height: size, cursor: p.tool === 'inspect' ? 'default' : 'crosshair' }}
+          style={{
+            width: size * cssZ,
+            height: size * cssZ,
+            transform: cssZ > 1 ? `translate(${-view.ox * size * cssZ}px, ${-view.oy * size * cssZ}px)` : undefined,
+            transformOrigin: '0 0',
+            touchAction: 'none',
+            cursor: drag.current?.panning ? 'grabbing' : p.tool === 'inspect' ? (cssZ > 1 ? 'grab' : 'default') : 'crosshair',
+          }}
+          onContextMenu={(e) => e.preventDefault()}
           onPointerMove={(e) => {
             const c = cellFromEvent(e);
             if (e.pointerType !== 'mouse') {
-              // no hover on touch: only a paint drag does anything
-              if (painting.current && c !== null && PAINT_TOOLS.includes(p.tool)) p.onPaint(c);
+              const prev = pointers.current.get(e.pointerId);
+              if (!prev) return;
+              pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              // two fingers: pinch-zoom around the midpoint, and pan with it
+              if (pinch.current && pointers.current.size >= 2) {
+                const [a, b] = [...pointers.current.values()];
+                const d = Math.hypot(a.x - b.x, a.y - b.y);
+                const m = framePoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
+                panBy(m.x - pinch.current.mx, m.y - pinch.current.my);
+                zoomAt(m.x, m.y, (pinch.current.z * d) / pinch.current.d);
+                pinch.current.mx = m.x;
+                pinch.current.my = m.y;
+                return;
+              }
+              if (painting.current) {
+                if (c !== null && PAINT_TOOLS.includes(p.tool)) p.onPaint(c);
+                return;
+              }
+              // one finger: drag to pan once it moves past a small threshold (cancels the tap)
+              const t = tap.current;
+              if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) > 8) {
+                tap.current = null;
+                drag.current = { x: e.clientX, y: e.clientY, panning: true };
+              }
+              if (drag.current?.panning) {
+                panBy(e.clientX - drag.current.x, e.clientY - drag.current.y);
+                drag.current.x = e.clientX;
+                drag.current.y = e.clientY;
+              }
               return;
+            }
+            // mouse: drag-pan (right/middle button, or left button with the inspect tool)
+            if (drag.current && e.buttons === 0) drag.current = null; // released outside the map
+            const dg = drag.current;
+            if (dg) {
+              if (!dg.panning && Math.hypot(e.clientX - dg.x, e.clientY - dg.y) > 4) dg.panning = true;
+              if (dg.panning) {
+                panBy(e.clientX - dg.x, e.clientY - dg.y);
+                dg.x = e.clientX;
+                dg.y = e.clientY;
+                return;
+              }
             }
             if (c !== hoverRef.current) {
               hoverRef.current = c;
@@ -158,35 +298,80 @@ export function MapCanvas(p: Props) {
           }}
           onPointerDown={(e) => {
             const c = cellFromEvent(e);
-            if (c === null) return;
-            if (PAINT_TOOLS.includes(p.tool)) {
-              painting.current = true;
-              if (e.pointerType !== 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
-              p.onPaint(c);
-              return;
-            }
-            if (e.pointerType === 'mouse' || isFreeTap(p.tool, p.trenchStart) || !p.onSelect) {
-              if (e.pointerType !== 'mouse') {
-                // show the tapped cell's info, since touch has no hover
-                hoverRef.current = c;
-                touchSel.current = true;
-                setHover(c);
-                p.onHover(c);
-                paint();
+            if (e.pointerType === 'mouse') {
+              // right/middle drag pans without acting; left click acts exactly as before
+              if (e.button !== 0) {
+                if (viewRef.current.z > 1) {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  drag.current = { x: e.clientX, y: e.clientY, panning: true };
+                }
+                return;
               }
+              if (c === null) return;
+              if (PAINT_TOOLS.includes(p.tool)) {
+                painting.current = true;
+                p.onPaint(c);
+                return;
+              }
+              if (p.tool === 'inspect' && viewRef.current.z > 1) drag.current = { x: e.clientX, y: e.clientY, panning: false };
               p.onCellClick(c);
               return;
             }
-            hoverRef.current = c;
-            touchSel.current = true;
-            setHover(c);
-            p.onHover(c);
-            p.onSelect(c);
-            paint();
+            // touch / pen
+            e.currentTarget.setPointerCapture(e.pointerId);
+            pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.current.size >= 2) {
+              // second finger: switch to pinch, abandon any tap or paint stroke
+              const [a, b] = [...pointers.current.values()];
+              const m = framePoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
+              pinch.current = { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), z: viewRef.current.z, mx: m.x, my: m.y };
+              tap.current = null;
+              drag.current = null;
+              painting.current = false;
+              return;
+            }
+            if (c === null) return;
+            if (PAINT_TOOLS.includes(p.tool)) {
+              painting.current = true;
+              p.onPaint(c);
+              return;
+            }
+            // act on lift, so a drag can pan instead
+            tap.current = { x: e.clientX, y: e.clientY, c };
           }}
-          onPointerUp={() => (painting.current = false)}
-          onPointerCancel={() => (painting.current = false)}
+          onPointerUp={(e) => {
+            if (e.pointerType === 'mouse') {
+              painting.current = false;
+              drag.current = null;
+              return;
+            }
+            const t = tap.current;
+            tap.current = null;
+            const wasPinch = pointers.current.size > 1 || !!pinch.current;
+            endPointer(e);
+            if (t && !wasPinch) touchTap(t.c);
+          }}
+          onPointerCancel={(e) => {
+            tap.current = null;
+            if (e.pointerType === 'mouse') {
+              painting.current = false;
+              drag.current = null;
+            } else endPointer(e);
+          }}
         />
+        <div className="map-zoom">
+          <button title="Zoom in" onClick={() => zoomAt(size / 2, size / 2, view.z * 1.5)} disabled={view.z >= maxZ - 0.01}>
+            +
+          </button>
+          <button title="Zoom out" onClick={() => zoomAt(size / 2, size / 2, view.z / 1.5)} disabled={view.z <= 1}>
+            −
+          </button>
+          {view.z > 1 && (
+            <button title="Show the whole claim" onClick={() => setView(clampView(1, 0, 0))}>
+              ⤢
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

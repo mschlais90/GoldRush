@@ -408,6 +408,28 @@ input[type='number'] {
 .map-frame canvas {
   display: block;
 }
+.map-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-zoom button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  background: rgba(18, 22, 27, 0.8);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.map-zoom button:disabled {
+  opacity: 0.35;
+}
 
 .legend {
   display: flex;
