@@ -12,7 +12,6 @@ export function TitleScreen() {
       <div className="title-content">
         <div className="title-kicker">Est. 1849</div>
         <h1>GoldRush</h1>
-        <p className="tagline">Read the ground. Drill the target. Pour the gold.</p>
         {!hasSave && <p className="title-hint">New here? Start with the tutorial: it walks you through your first profitable mine.</p>}
         <div className="title-btns">
           {hasSave && <button onClick={() => store.load()}>Continue</button>}

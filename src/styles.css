@@ -788,7 +788,7 @@ table.res td {
 .title-hint {
   color: #f3d28a;
   font-size: 14px;
-  margin: -4px 0 0;
+  margin: 0;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
 }
 button.pulse {
@@ -922,17 +922,12 @@ button.pulse {
   font-family: var(--display);
   font-weight: 400;
   font-size: clamp(56px, 10vw, 112px);
-  margin: 0;
+  margin: 0 0 12px;
   background: linear-gradient(180deg, #fff3c4 0%, #f2c14e 45%, #b8741a 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 30px rgba(242, 193, 78, 0.35));
-}
-.tagline {
-  color: #e6d6b8;
-  font-size: 18px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
 }
 .title-btns {
   display: flex;
