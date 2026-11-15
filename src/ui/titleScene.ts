@@ -18,6 +18,10 @@ export interface Scene {
   flume: { from: Pt; to: Pt };
   fire: Pt;
   tent: Pt;
+  /** Phone framing: the scene is cropped to its middle, so skip the cloud streaks and the edge-framing pines (only slivers would show). */
+  phone?: boolean;
+  /** The part of the scene actually on screen, when it's cropped (phones); the vignette centres on it. */
+  view?: { x: number; y: number; w: number; h: number };
 }
 
 interface Ridge {
@@ -113,11 +117,13 @@ export function paintScene(cv: HTMLCanvasElement, s: Scene, dpr: number) {
   rock(ctx, bank + 18 * u, h * 0.975, 22 * u, 13 * u, rand);
   pan(ctx, rx - 76 * u, h * 0.965, 46 * u, 0.32, 0, true, u, rand);
 
-  // framing pines
-  pine(ctx, w * 0.035, h * 1.03, h * 0.52, '#0d0805', rand, 0.3);
-  pine(ctx, w * 0.09, h * 1.0, h * 0.3, '#100a06', rand, 0.3);
-  pine(ctx, w * 0.968, h * 1.03, h * 0.48, '#0d0805', rand, 0.3);
-  pine(ctx, w * 0.925, h * 0.985, h * 0.26, '#100a06', rand, 0.3);
+  // framing pines (desktop only: on a phone's cropped view they'd be cut to unrecognisable slivers)
+  if (!s.phone) {
+    pine(ctx, w * 0.035, h * 1.03, h * 0.52, '#0d0805', rand, 0.3);
+    pine(ctx, w * 0.09, h * 1.0, h * 0.3, '#100a06', rand, 0.3);
+    pine(ctx, w * 0.968, h * 1.03, h * 0.48, '#0d0805', rand, 0.3);
+    pine(ctx, w * 0.925, h * 0.985, h * 0.26, '#100a06', rand, 0.3);
+  }
 
   // grass along the banks and the foreground
   for (let i = 0; i < 70; i++) {
@@ -128,8 +134,12 @@ export function paintScene(cv: HTMLCanvasElement, s: Scene, dpr: number) {
   }
   for (let i = 0; i < 60; i++) tuft(ctx, rand() * w, h * (0.975 + rand() * 0.03), (12 + rand() * 16) * u, rand);
 
-  // vignette keeps the eye on the title
-  const vg = ctx.createRadialGradient(w / 2, h * 0.45, Math.max(w, h) * 0.3, w / 2, h * 0.45, Math.max(w, h) * 0.85);
+  // vignette keeps the eye on the title, centred on whatever part of the scene is on screen
+  const v = s.view ?? { x: 0, y: 0, w, h };
+  const vcx = v.x + v.w / 2;
+  const vcy = v.y + v.h * 0.45;
+  const vr = Math.max(v.w, v.h);
+  const vg = ctx.createRadialGradient(vcx, vcy, vr * 0.3, vcx, vcy, vr * 0.85);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(0,0,0,0.6)');
   ctx.fillStyle = vg;
@@ -176,7 +186,8 @@ function paintSky(ctx: Ctx, s: Scene, rand: () => number) {
   ctx.arc(sx, sy, 30 * u, 0, Math.PI * 2);
   ctx.fill();
 
-  // long, low streaks of cloud lit from beneath
+  // long, low streaks of cloud lit from beneath (desktop only)
+  if (s.phone) return;
   ctx.save();
   ctx.filter = `blur(${Math.max(1, Math.round(4 * u))}px)`;
   for (let i = 0; i < 8; i++) {
@@ -1098,20 +1109,23 @@ export function animateScene(ctx: Ctx, s: Scene, t: number) {
   // campfire
   const [fx, fy] = s.fire;
   const fl = 0.85 + 0.15 * Math.sin(t * 9) * Math.sin(t * 5.3 + 1);
+  // on a phone the camp sits small and low, so the fire throws a wider, warmer light
+  const lit = s.phone ? 1.6 : 1;
+  const gr = 140 * u * fl * (s.phone ? 1.5 : 1);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(fx, fy - 8 * u, 0, fx, fy - 8 * u, 140 * u * fl);
-  glow.addColorStop(0, 'rgba(255,150,60,0.32)');
-  glow.addColorStop(0.4, 'rgba(200,80,20,0.1)');
+  const glow = ctx.createRadialGradient(fx, fy - 8 * u, 0, fx, fy - 8 * u, gr);
+  glow.addColorStop(0, `rgba(255,150,60,${0.32 * lit})`);
+  glow.addColorStop(0.4, `rgba(200,80,20,${0.1 * lit})`);
   glow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(fx - 150 * u, fy - 150 * u, 300 * u, 300 * u);
+  ctx.fillRect(fx - gr - 10 * u, fy - gr - 10 * u, 2 * gr + 20 * u, 2 * gr + 20 * u);
   const [tx, ty] = s.tent;
-  const door = ctx.createRadialGradient(tx, ty - 14 * u, 0, tx, ty - 14 * u, 30 * u);
-  door.addColorStop(0, `rgba(255,170,80,${0.12 + 0.08 * fl})`);
+  const door = ctx.createRadialGradient(tx, ty - 14 * u, 0, tx, ty - 14 * u, 30 * u * (s.phone ? 1.4 : 1));
+  door.addColorStop(0, `rgba(255,170,80,${(0.12 + 0.08 * fl) * lit})`);
   door.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = door;
-  ctx.fillRect(tx - 30 * u, ty - 44 * u, 60 * u, 60 * u);
+  ctx.fillRect(tx - 45 * u, ty - 60 * u, 90 * u, 90 * u);
   ctx.restore();
   for (let i = 0; i < 5; i++) {
     const off = (i - 2) * 4.5 * u;
@@ -1141,6 +1155,43 @@ export function animateScene(ctx: Ctx, s: Scene, t: number) {
     ctx.arc(ex2, ey2, (0.6 + rnd(i + 650)) * u, 0, Math.PI * 2);
     ctx.fill();
   }
+  // glowing embers: bigger than the sparks, they ride the heat high above the fire and wink out
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 9; i++) {
+    const p = (rnd(i + 1200) + t * (0.09 + 0.05 * rnd(i + 1210))) % 1;
+    const ex3 = fx + (rnd(i + 1220) - 0.5) * 24 * u + Math.sin(t * 1.3 + i * 2.1) * 26 * u * p + p * 40 * u;
+    const ey3 = fy - 16 * u - p * 260 * u;
+    const a = (1 - p) * Math.min(1, p * 8) * (0.6 + 0.4 * Math.sin(t * 7 + i));
+    const r = (5 + 3 * rnd(i + 1230)) * u;
+    const eg = ctx.createRadialGradient(ex3, ey3, 0, ex3, ey3, r);
+    eg.addColorStop(0, `rgba(255,220,140,${a})`);
+    eg.addColorStop(0.25, `rgba(255,140,50,${a * 0.6})`);
+    eg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(ex3 - r, ey3 - r, 2 * r, 2 * r);
+  }
+  // fireflies blinking low over the creek banks
+  for (let i = 0; i < 14; i++) {
+    const by = s.creekTop + (h - s.creekTop) * (0.25 + 0.7 * rnd(i + 1300));
+    const c = creekAt(s, by);
+    const side = rnd(i + 1310) < 0.5 ? -1 : 1;
+    const bx = c.x + side * (c.hw + (20 + 160 * rnd(i + 1320)) * u);
+    const x = bx + Math.sin(t * (0.4 + 0.3 * rnd(i + 1330)) + i) * 22 * u;
+    const y = by - (8 + 30 * rnd(i + 1340)) * u + Math.sin(t * (0.7 + 0.4 * rnd(i + 1350)) + i * 1.7) * 9 * u;
+    // each blinks on a slow cycle of its own, dark most of the time
+    const blink = Math.max(0, Math.sin(t * (0.9 + 0.6 * rnd(i + 1360)) + i * 2.4)) ** 6;
+    if (blink < 0.02) continue;
+    const r = 6 * u;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(230,255,150,${0.9 * blink})`);
+    g.addColorStop(0.3, `rgba(190,230,90,${0.35 * blink})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  ctx.restore();
+
   // smoke curling up and drifting downwind
   for (let i = 0; i < 16; i++) {
     const p = (rnd(i + 700) + t * 0.05) % 1;

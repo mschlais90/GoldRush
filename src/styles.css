@@ -918,6 +918,15 @@ button.pulse {
   font-size: 16px;
   padding: 10px 20px;
 }
+.title-cta {
+  font-size: 19px;
+  font-weight: 700;
+  padding: 12px 48px;
+  min-width: 260px;
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.45),
+    0 0 28px rgba(242, 193, 78, 0.35);
+}
 .scores-panel {
   width: min(520px, 90vw);
 }
@@ -1347,6 +1356,12 @@ button.pulse {
   .title-btns button {
     font-size: 15px;
     padding: 9px 10px;
+  }
+  .title-cta {
+    width: min(340px, 100%);
+    min-width: 0;
+    padding: 12px 10px;
+    font-size: 18px;
   }
   /* an odd last button (e.g. Settings) spans the row */
   .title-btns button:last-child:nth-child(odd) {

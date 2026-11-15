@@ -13,12 +13,19 @@ export function TitleScreen() {
         <div className="title-kicker">Est. 1849</div>
         <h1>GoldRush</h1>
         {!hasSave && <p className="title-hint">New here? Start with the tutorial: it walks you through your first profitable mine.</p>}
+        {/* returning players almost always want to pick up where they left off */}
+        {hasSave && (
+          <button className="title-cta" onClick={() => store.load()}>
+            ▶ Continue
+          </button>
+        )}
         <div className="title-btns">
-          {hasSave && <button onClick={() => store.load()}>Continue</button>}
           <button className={hasSave ? 'secondary' : 'pulse'} onClick={() => store.newTutorial()} title="A guided first mine, step by step">
             🎓 Tutorial
           </button>
-          <button onClick={() => store.newGame()}>New game</button>
+          <button className={hasSave ? 'secondary' : ''} onClick={() => store.newGame()}>
+            New game
+          </button>
           <SettingsButton className="secondary" label="⚙ Settings" />
         </div>
         {scores.length > 0 && (

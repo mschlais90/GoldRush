@@ -54,12 +54,13 @@ function frameScene(w: number, h: number): { scene: Scene; ox: number; oy: numbe
   if (w > MOBILE_MAX_WIDTH || h <= w) return { scene: layoutScene(w, h), ox: 0, oy: 0 };
   const vw = Math.round(w * 1.6);
   const vh = Math.round(h * 1.3);
-  const scene = layoutScene(vw, vh);
+  const base = layoutScene(vw, vh);
   // centre on the span from the sluice's upstream end to the far side of the tent
-  const left = scene.sluice.x;
-  const right = scene.tent[0] + 60 * scene.u;
+  const left = base.sluice.x;
+  const right = base.tent[0] + 60 * base.u;
   const ox = Math.max(0, Math.min(vw - w, (left + right) / 2 - w / 2));
-  return { scene, ox, oy: vh - h };
+  const oy = vh - h;
+  return { scene: { ...base, phone: true, view: { x: ox, y: oy, w, h } }, ox, oy };
 }
 
 /** A one-shot burst of gold flakes, used when an assay comes back rich. */
