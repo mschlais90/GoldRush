@@ -1189,8 +1189,10 @@ button.pulse {
   }
 
   /* title screen */
+  /* title and buttons sit up in the sky so the camp and sluice below stay visible */
   .title-content {
-    padding: 0 16px 8vh;
+    justify-content: flex-start;
+    padding: calc(10dvh + env(safe-area-inset-top)) 16px 24px;
   }
   .title-btns {
     flex-wrap: wrap;

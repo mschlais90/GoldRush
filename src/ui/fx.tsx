@@ -1,6 +1,7 @@
 // Visual effects: title backdrop, gold particle burst, value-change flashes.
 import { useEffect, useRef, useState } from 'react';
 import { animateScene, layoutScene, paintScene, type Scene } from './titleScene';
+import { MOBILE_MAX_WIDTH } from './useIsMobile';
 
 /** Animated title backdrop: a placer camp at dusk (see titleScene.ts). */
 export function TitleBackdrop() {
@@ -12,28 +13,53 @@ export function TitleBackdrop() {
     const bg = document.createElement('canvas');
     let scene: Scene | null = null;
     let sceneDpr = 0;
+    let sw = 0;
+    let sh = 0;
+    // offset of the visible window into the (possibly larger) laid-out scene
+    let ox = 0;
+    let oy = 0;
     let raf = 0;
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
       const dpr = window.devicePixelRatio || 1;
       const w = cv.clientWidth;
       const h = cv.clientHeight;
-      if (!scene || scene.w !== w || scene.h !== h || sceneDpr !== dpr) {
+      if (!scene || sw !== w || sh !== h || sceneDpr !== dpr) {
         cv.width = Math.round(w * dpr);
         cv.height = Math.round(h * dpr);
-        scene = layoutScene(w, h);
+        sw = w;
+        sh = h;
+        ({ scene, ox, oy } = frameScene(w, h));
         sceneDpr = dpr;
         paintScene(bg, scene, dpr);
       }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(bg, 0, 0);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.drawImage(bg, -ox * dpr, -oy * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, -ox * dpr, -oy * dpr);
       animateScene(ctx, scene, now / 1000);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
   }, []);
   return <canvas ref={ref} className="title-backdrop" />;
+}
+
+/**
+ * Choose the scene to lay out and which part of it to show. Desktop and landscape screens get the
+ * scene at exactly the screen size. Portrait phones get a larger virtual scene, cropped: the extra
+ * height trims sky off the top (raising the horizon) and the extra width makes the sluice and camp
+ * bigger, with the window centred on them.
+ */
+function frameScene(w: number, h: number): { scene: Scene; ox: number; oy: number } {
+  if (w > MOBILE_MAX_WIDTH || h <= w) return { scene: layoutScene(w, h), ox: 0, oy: 0 };
+  const vw = Math.round(w * 1.6);
+  const vh = Math.round(h * 1.3);
+  const scene = layoutScene(vw, vh);
+  // centre on the span from the sluice's upstream end to the far side of the tent
+  const left = scene.sluice.x;
+  const right = scene.tent[0] + 60 * scene.u;
+  const ox = Math.max(0, Math.min(vw - w, (left + right) / 2 - w / 2));
+  return { scene, ox, oy: vh - h };
 }
 
 /** A one-shot burst of gold flakes, used when an assay comes back rich. */
