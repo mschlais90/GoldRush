@@ -4,6 +4,28 @@
 import { next, type RngState } from '../sim/rng';
 
 type Ctx = CanvasRenderingContext2D;
+
+/**
+ * Paint something softened, as `ctx.filter = 'blur(Npx)'` would, but in a way every browser
+ * supports (Safari ignores canvas filters, which drew these shapes hard-edged on iPhones).
+ * The shapes are drawn small on a scratch canvas and scaled back up with smoothing, which
+ * blurs their edges by about `blur` CSS pixels while keeping colours and gradients. (Measured
+ * in CSS rather than device pixels so high-density phone screens get the same softness.)
+ */
+function soft(ctx: Ctx, s: Pick<Scene, 'w' | 'h'>, blur: number, draw: (c: Ctx) => void) {
+  const k = Math.max(1, blur); // CSS px per scratch pixel
+  const cv = document.createElement('canvas');
+  cv.width = Math.ceil(s.w / k);
+  cv.height = Math.ceil(s.h / k);
+  const c = cv.getContext('2d')!;
+  c.scale(1 / k, 1 / k);
+  draw(c);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(cv, 0, 0, cv.width * k, cv.height * k);
+  ctx.restore();
+}
 type Pt = [number, number];
 
 export interface Scene {
@@ -188,23 +210,22 @@ function paintSky(ctx: Ctx, s: Scene, rand: () => number) {
 
   // long, low streaks of cloud lit from beneath (desktop only)
   if (s.phone) return;
-  ctx.save();
-  ctx.filter = `blur(${Math.max(1, Math.round(4 * u))}px)`;
-  for (let i = 0; i < 8; i++) {
-    const cy = h * (0.3 + rand() * 0.3);
-    const cw = (180 + rand() * 340) * u;
-    const ch = (4 + rand() * 9) * u;
-    const cx = rand() * w;
-    const near = Math.max(0, 1 - Math.abs(cx - sx) / (w * 0.5));
-    const cg = ctx.createLinearGradient(0, cy - ch, 0, cy + ch);
-    cg.addColorStop(0, 'rgba(60,40,60,0.35)');
-    cg.addColorStop(1, `rgba(255,${Math.round(150 + 50 * near)},90,${0.2 + 0.5 * near * (cy / (h * 0.6))})`);
-    ctx.fillStyle = cg;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, cw / 2, ch, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  soft(ctx, s, Math.max(1, Math.round(4 * u)), (c) => {
+    for (let i = 0; i < 8; i++) {
+      const cy = h * (0.3 + rand() * 0.3);
+      const cw = (180 + rand() * 340) * u;
+      const ch = (4 + rand() * 9) * u;
+      const cx = rand() * w;
+      const near = Math.max(0, 1 - Math.abs(cx - sx) / (w * 0.5));
+      const cg = c.createLinearGradient(0, cy - ch, 0, cy + ch);
+      cg.addColorStop(0, 'rgba(60,40,60,0.35)');
+      cg.addColorStop(1, `rgba(255,${Math.round(150 + 50 * near)},90,${0.2 + 0.5 * near * (cy / (h * 0.6))})`);
+      c.fillStyle = cg;
+      c.beginPath();
+      c.ellipse(cx, cy, cw / 2, ch, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  });
 }
 
 function ridgePath(ctx: Ctx, s: Scene, r: Ridge) {
@@ -251,17 +272,26 @@ function haze(ctx: Ctx, s: Scene, a: number) {
 
 function groundMottle(ctx: Ctx, s: Scene, rand: () => number) {
   const { w, h, u } = s;
-  ctx.save();
-  ctx.filter = `blur(${Math.max(1, Math.round(10 * u))}px)`;
+  // Each patch fades from its centre to nothing, so the ground reads as blotchy soil with no
+  // outlines (hard-edged ellipses showed up as distinct "circles", especially on phones).
   for (let i = 0; i < 70; i++) {
     const y = h * (0.82 + rand() * 0.2);
     const r = (30 + rand() * 90) * u;
-    ctx.fillStyle = rand() < 0.5 ? 'rgba(110,75,45,0.18)' : 'rgba(8,5,3,0.25)';
-    ctx.beginPath();
-    ctx.ellipse(rand() * w, y, r, r * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const light = rand() < 0.5;
+    const x = rand() * w;
+    const [rgb, a] = light ? ['110,75,45', 0.16] : ['8,5,3', 0.22];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, 0.3); // squash to lie flat on the ground
+    const R = r * 1.25;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g.addColorStop(0, `rgba(${rgb},${a})`);
+    g.addColorStop(0.5, `rgba(${rgb},${a * 0.6})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 /** A spruce: ragged, drooping branch tips down each side of a narrow crown. */
@@ -328,16 +358,15 @@ function polyFill(ctx: Ctx, left: Pt[], right: Pt[]) {
 function paintCreek(ctx: Ctx, s: Scene, rand: () => number) {
   const { h, u } = s;
   // soft gravel bars, then the wet margin, then water
-  ctx.save();
-  ctx.filter = `blur(${Math.max(1, Math.round(5 * u))}px)`;
-  const bars = creekBanks(s, 1.3);
-  polyFill(ctx, bars.left, bars.right);
-  const bg = ctx.createLinearGradient(0, s.creekTop, 0, h);
-  bg.addColorStop(0, 'rgba(150,100,60,0.35)');
-  bg.addColorStop(1, 'rgba(70,50,36,0.55)');
-  ctx.fillStyle = bg;
-  ctx.fill();
-  ctx.restore();
+  soft(ctx, s, Math.max(1, Math.round(5 * u)), (c) => {
+    const bars = creekBanks(s, 1.3);
+    polyFill(c, bars.left, bars.right);
+    const bg = c.createLinearGradient(0, s.creekTop, 0, h);
+    bg.addColorStop(0, 'rgba(150,100,60,0.35)');
+    bg.addColorStop(1, 'rgba(70,50,36,0.55)');
+    c.fillStyle = bg;
+    c.fill();
+  });
   const wet = creekBanks(s, 1.08);
   polyFill(ctx, wet.left, wet.right);
   ctx.fillStyle = 'rgba(24,16,11,0.85)';
@@ -355,12 +384,13 @@ function paintCreek(ctx: Ctx, s: Scene, rand: () => number) {
   // soft reflection of the bright sky down the middle of the channel
   ctx.save();
   ctx.clip();
-  ctx.filter = `blur(${Math.max(1, Math.round(8 * u))}px)`;
-  for (let y = s.creekTop; y < h; y += 6) {
-    const c = creekAt(s, y);
-    ctx.fillStyle = `rgba(255,190,120,${0.18 * (1 - c.t)})`;
-    ctx.fillRect(c.x - c.hw * 0.4, y, c.hw * 0.8, 6);
-  }
+  soft(ctx, s, Math.max(1, Math.round(8 * u)), (g) => {
+    for (let y = s.creekTop; y < h; y += 6) {
+      const c = creekAt(s, y);
+      g.fillStyle = `rgba(255,190,120,${0.18 * (1 - c.t)})`;
+      g.fillRect(c.x - c.hw * 0.4, y, c.hw * 0.8, 6);
+    }
+  });
   ctx.restore();
   // foam lines where water meets the bank
   for (const side of [water.left, water.right]) {
