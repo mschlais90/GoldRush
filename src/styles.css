@@ -1042,14 +1042,33 @@ button.pulse {
   .stat.big span:nth-child(2) {
     font-size: 15px;
   }
+  /* second row: ☰ then the three time buttons, always together */
+  .topbar::before {
+    content: '';
+    order: 8;
+    flex-basis: 100%;
+    height: 0;
+    margin-top: -4px; /* cancel the extra row gap this zero-height line adds */
+  }
+  .topbar .menu-btn {
+    order: 9;
+    min-height: 38px;
+    padding: 0 12px;
+  }
   .advance {
     order: 10;
-    flex-basis: 100%;
+    flex: 1 1 0;
+    min-width: 0;
     margin-left: 0;
+    gap: 4px;
   }
   .advance button {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 38px;
+    padding: 0 4px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
   /* one pane at a time */
