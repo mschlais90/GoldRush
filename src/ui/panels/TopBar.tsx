@@ -3,6 +3,7 @@ import type { GameState } from '../../sim/state';
 import { dateLabel, money, oz } from '../format';
 import { useFlash } from '../fx';
 import { store } from '../store';
+import { useIsMobile } from '../useIsMobile';
 
 export function Sparkline({ data, width = 120, height = 28, window = 120, title }: { data: number[]; width?: number; height?: number; window?: number; title?: string }) {
   const pts = window > 0 ? data.slice(-window) : data;
@@ -46,6 +47,7 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
   const chg = ((s.goldPrice - prev) / prev) * 100;
   const daysLeft = s.endDay - s.day;
   const adv = (days: number) => store.dispatch({ type: 'advance', days });
+  const mobile = useIsMobile();
   return (
     <header className="topbar">
       <div className="brand">GoldRush</div>
@@ -71,11 +73,14 @@ export function TopBar({ s, onQuit }: { s: GameState; onQuit: () => void }) {
       )}
       <FlashStat label="Net worth" value={w} threshold={100} text={money(w)} cls="gold" big fmt={(d) => money(d)} />
       <Sparkline data={s.netWorthHistory ?? [w]} window={0} title="Net worth since day 0" />
-      <div className="advance">
-        <button data-tut="advance-day" onClick={() => adv(1)} title="Space">+1 day</button>
-        <button data-tut="advance-week" onClick={() => adv(7)} title="W">+1 week</button>
-        <button data-tut="advance-month" onClick={() => adv(30)} title="M">+30 days</button>
-      </div>
+      {/* on phones the time controls live in the bottom bar instead */}
+      {!mobile && (
+        <div className="advance">
+          <button data-tut="advance-day" onClick={() => adv(1)} title="Space">+1 day</button>
+          <button data-tut="advance-week" onClick={() => adv(7)} title="W">+1 week</button>
+          <button data-tut="advance-month" onClick={() => adv(30)} title="M">+30 days</button>
+        </div>
+      )}
       <button className="ghost menu-btn" onClick={onQuit} title="Save & return to title">☰</button>
     </header>
   );

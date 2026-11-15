@@ -2,7 +2,17 @@
 // the hidden truth it reveals (with noise) when it completes.
 import { GRID_D, GRID_H, GRID_W, LAYER_M, ci, cx, cy, inBounds, vi, type WorldTruth } from './geology/types';
 import type { Rng } from './rng';
-import type { Knowledge } from './state';
+import type { Knowledge, Property } from './state';
+
+/** Whole-claim surveys are one per claim: true once a full walk-over is done or under way. */
+export function walkAllDone(p: Property): boolean {
+  return p.jobs.some((j) => j.kind === 'walkoverAll' && !j.done) || p.knowledge.clues.every((c) => c >= 0);
+}
+
+/** True once an IP survey is done or under way. */
+export function geophysDone(p: Property): boolean {
+  return !!p.knowledge.geophys || p.jobs.some((j) => j.kind === 'geophys' && !j.done);
+}
 
 export const COSTS = {
   walkover: { cost: 400, days: 1, radius: 6 },

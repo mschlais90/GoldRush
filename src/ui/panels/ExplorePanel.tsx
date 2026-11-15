@@ -1,12 +1,13 @@
+import { useState } from 'react';
 import { modelKey } from '../../sim/economy';
 import { getModel } from '../../sim/estimate';
 import { CLUE_NAMES, GRID_D, LAYER_M, cx, cy, vi } from '../../sim/geology/types';
 import { columnLabel } from '../../sim/market';
-import { COSTS, bestIntercept, drillCost, drillDays, sampleAt } from '../../sim/prospecting';
+import { COSTS, bestIntercept, drillCost, drillDays, geophysDone, sampleAt, walkAllDone } from '../../sim/prospecting';
 import type { GameState, Hole, Property } from '../../sim/state';
 import { getTruth } from '../../sim/truth';
 import { grade, gradeColor, money, rgb } from '../format';
-import type { Overlay, Tool } from '../map/MapCanvas';
+import { ClueIcon, type Overlay, type Tool } from '../map/MapCanvas';
 
 interface ToolDef {
   id: Tool;
@@ -16,7 +17,7 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
-  { id: 'inspect', name: '🔍 Inspect', cost: '', desc: 'Hover cells to see what you know. Click a drill hole for its core log.' },
+  { id: 'inspect', name: '🔍 Inspect', cost: '', desc: 'Hover or tap a cell to see what it is and what you know. Click a drill hole for its core log.' },
   { id: 'walkover', name: '🥾 Walk-over', cost: `${money(COSTS.walkover.cost)} · ${COSTS.walkover.days}d`, desc: 'Geologist maps outcrops & surface clues in a radius.' },
   { id: 'pan', name: '🥣 Pan creek', cost: `${money(COSTS.pan.cost)} · ${COSTS.pan.days}d`, desc: 'Count gold colors in stream gravel. Gold travels downstream: follow the trail up to its source.' },
   { id: 'soil', name: '🧪 Soil grid', cost: `${money(COSTS.soil.cost)} · ${COSTS.soil.days}d + ${COSTS.soil.labDays}d lab`, desc: '49 soil samples on a grid. Picks up near-surface gold; deep cover masks it.' },
@@ -48,7 +49,8 @@ interface Props {
 
 export function ExplorePanel(props: Props) {
   const { p, tool, setTool, drillDepth, rush } = props;
-  const geoDone = !!p.knowledge.geophys || p.jobs.some((j) => j.kind === 'geophys' && !j.done);
+  const geoDone = geophysDone(p);
+  const walkDone = walkAllDone(p);
   const busy = (lane: keyof Property['lanes']) => Math.max(0, p.lanes[lane] - props.s.day);
   return (
     <div className="panel">
@@ -78,11 +80,22 @@ export function ExplorePanel(props: Props) {
         </div>
       )}
       <div className="row wrap">
-        <button className="secondary small-btn" data-tut="walk-all" onClick={props.onWalkAll} title="Map every clue on the claim">
-          Full walk-over {money(COSTS.walkoverAll.cost)} · {COSTS.walkoverAll.days}d
+        <button
+          className="secondary small-btn"
+          data-tut="walk-all"
+          disabled={walkDone}
+          onClick={props.onWalkAll}
+          title={walkDone ? 'Already done for this claim' : 'Map every clue on the claim (once per claim)'}
+        >
+          {walkDone ? '✓ Full walk-over done' : `Full walk-over ${money(COSTS.walkoverAll.cost)} · ${COSTS.walkoverAll.days}d`}
         </button>
-        <button className="secondary small-btn" disabled={geoDone} onClick={props.onGeophys} title="Induced-polarization survey of the whole claim">
-          IP geophysics {money(COSTS.geophys.cost)} · {COSTS.geophys.days}d
+        <button
+          className="secondary small-btn"
+          disabled={geoDone}
+          onClick={props.onGeophys}
+          title={geoDone ? 'Already done for this claim' : 'Induced-polarization survey of the whole claim (once per claim)'}
+        >
+          {geoDone ? '✓ IP geophysics done' : `IP geophysics ${money(COSTS.geophys.cost)} · ${COSTS.geophys.days}d`}
         </button>
       </div>
       <div className="small muted">
@@ -92,17 +105,39 @@ export function ExplorePanel(props: Props) {
   );
 }
 
-export function CellInfo({ p, c, slice }: { p: Property; c: number | null; slice: number }) {
-  if (c === null) return <div className="panel cellinfo muted small">Hover over the map for details.</div>;
+export function CellInfo({ p, c, slice, compact, onOpenHole }: { p: Property; c: number | null; slice: number; compact?: boolean; onOpenHole?: (id: number) => void }) {
+  if (c === null)
+    return compact ? (
+      <div className="cell-caption muted small">Tap a cell to see what's there.</div>
+    ) : (
+      <div className="panel cellinfo muted small">Hover over or tap a cell on the map to see what's there.</div>
+    );
   const k = p.knowledge;
   const surface = getTruth(p.seed, p.region); // public: stream only
   const model = getModel(modelKey(p), k);
   const x = cx(c);
   const y = cy(c);
-  const rows: string[] = [];
+  const rows: React.ReactNode[] = [];
   if (surface.stream[c]) rows.push('Creek');
-  if (k.clues[c] >= 0) rows.push(CLUE_NAMES[k.clues[c]]);
+  if (k.clues[c] >= 0)
+    rows.push(
+      <>
+        <ClueIcon clue={k.clues[c]} size={16} /> {CLUE_NAMES[k.clues[c]]}
+      </>,
+    );
   else rows.push('Not yet walked');
+  // things the player has put on this cell (what the old map legend used to explain)
+  for (const h of k.holes.filter((hh) => hh.c === c)) {
+    const grades = Array.from({ length: h.depth }, (_, z) => sampleAt(k, vi(x, y, z)) ?? 0);
+    const bi = h.status === 'done' ? bestIntercept(grades) : null;
+    rows.push(
+      `Drill hole ${h.name}: ${
+        h.status === 'done' ? (bi ? `best ${bi.metres} m @ ${grade(bi.grade)}` : 'assayed, no significant gold') : h.status === 'lab' ? 'assays at the lab' : 'drilling'
+      }`,
+    );
+  }
+  for (const t of k.trenches.filter((tt) => tt.cells.includes(c))) rows.push(`Trench ${t.name}${t.status === 'done' ? '' : t.status === 'lab' ? ': assays at the lab' : ': digging'}`);
+  if (p.mine.shaft?.c === c) rows.push(`Shaft collar: sunk to ${p.mine.shaft.depth * LAYER_M} m`);
   if (k.pans[c] !== undefined) rows.push(`Pan: ${k.pans[c]} colors`);
   if (k.soil[c] !== undefined) rows.push(`Soil: ${k.soil[c]} ppb Au`);
   if (k.geophys) rows.push(`Chargeability: ${k.geophys[c].toFixed(2)}`);
@@ -120,6 +155,10 @@ export function CellInfo({ p, c, slice }: { p: Property; c: number | null; slice
   if (bestConf > 0) rows.push(`Estimate${slice < 0 ? ' (best in column)' : ''}: ${grade(best)} · ${Math.round(bestConf * 100)}% confidence`);
   if (p.mine.mined[c] > 0) rows.push(`Mined to ${p.mine.mined[c] * LAYER_M} m`);
   if (p.mine.target[c] > p.mine.mined[c]) rows.push(`Pit planned to ${p.mine.target[c] * LAYER_M} m`);
+  if (compact) {
+    const hole = k.holes.find((h) => h.c === c);
+    return <CellCaption label={columnLabel(c)} rows={rows} onOpenHole={hole && onOpenHole ? () => onOpenHole(hole.id) : undefined} />;
+  }
   return (
     <div className="panel cellinfo">
       <b>Cell {columnLabel(c)}</b>
@@ -128,6 +167,32 @@ export function CellInfo({ p, c, slice }: { p: Property; c: number | null; slice
           {r}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Phone HUD: cell info as a caption over the map's bottom edge. Two lines; tap to expand. */
+function CellCaption({ label, rows, onOpenHole }: { label: string; rows: React.ReactNode[]; onOpenHole?: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`cell-caption small ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}>
+      <div className="cell-caption-rows">
+        <b>{label}</b>
+        {rows.map((r, i) => (
+          <span key={i}> · {r}</span>
+        ))}
+      </div>
+      {onOpenHole && (
+        <button
+          className="small-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenHole();
+          }}
+        >
+          Core log ›
+        </button>
+      )}
     </div>
   );
 }

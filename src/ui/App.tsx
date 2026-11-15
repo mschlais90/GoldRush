@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Clue, GRID_D, LAYER_M, cx, cy } from '../sim/geology/types';
+import { GRID_D, LAYER_M, cx, cy } from '../sim/geology/types';
 import { pitBlocksRemaining } from '../sim/mining';
 import { REGIONS } from '../sim/regions';
 import { money } from './format';
-import { ClueIcon, MapCanvas, type Overlay, type Tool } from './map/MapCanvas';
+import { MapCanvas, type Overlay, type Tool } from './map/MapCanvas';
 import { CellInfo, CoreLog, DrillHoleList, ExplorePanel, OVERLAYS } from './panels/ExplorePanel';
 import { LandOffice } from './panels/LandOffice';
 import { MinePanel } from './panels/MinePanel';
@@ -14,8 +14,20 @@ import { TitleScreen } from './TitleScreen';
 import { store, useGame, useVersion } from './store';
 import { Reveal3D } from './view3d/Reveal3D';
 import { TutorialCoach, tutorialMarks, type RightTab, type TutorialUi } from './Tutorial';
-import { ConfirmBar } from './panels/ConfirmBar';
-import { useIsMobile, type Pane } from './useIsMobile';
+import { ConfirmBar, DrillOptions, describeTap } from './panels/ConfirmBar';
+import { Sheet, TimeBar, ToolStrip } from './panels/MobileHud';
+import { columnLabel } from '../sim/market';
+import { COSTS, geophysDone, walkAllDone } from '../sim/prospecting';
+import { useIsMobile } from './useIsMobile';
+
+/** Phone HUD sheets that slide up over the map. */
+type SheetId = 'claims' | 'layers' | 'more' | 'hole' | null;
+const MORE_TABS: [RightTab, string][] = [
+  ['mine', 'Mine'],
+  ['report', 'Report'],
+  ['bank', 'Bank'],
+  ['awards', 'Awards'],
+];
 
 export function App() {
   const s = useGame();
@@ -38,8 +50,10 @@ export function App() {
   const [xray, setXray] = useState(true);
   const [showTruth, setShowTruth] = useState(false);
   const mobile = useIsMobile();
-  const [pane, setPane] = useState<Pane>('map');
   const [pending, setPending] = useState<number | null>(null);
+  const [sheet, setSheet] = useState<SheetId>(null);
+  /** Phone: a whole-claim action (walk-all, IP survey) awaiting confirmation. */
+  const [pendingAction, setPendingAction] = useState<{ text: string; run: () => void } | null>(null);
 
   // keyboard shortcuts for time
   useEffect(() => {
@@ -75,7 +89,7 @@ export function App() {
   const pickClaim = (id: number) => {
     setPropId(id);
     setPending(null);
-    if (mobile) setPane('map');
+    if (mobile) setSheet(null);
   };
 
   const onCellClick = (c: number) => {
@@ -119,198 +133,385 @@ export function App() {
     setTool(t);
     setTrenchStart(null);
     setPending(null);
-    if (mobile && t !== 'inspect') setPane('map');
+    setPendingAction(null);
+    // picking a map tool from the Mine sheet: get the sheet out of the way so the map can be used
+    if (mobile && t !== 'inspect') setSheet(null);
     if (t === 'pit') setOverlay('pit');
     if (t === 'stope') setOverlay('estimate');
   };
 
-  return (
-    <div className="app">
-      <TopBar s={s} onQuit={() => store.quit()} />
-      <div className="main" data-pane={mobile ? pane : undefined}>
-        <aside className="left" data-pane-id="claims">
-          <div className="panel">
-            <h3>Your claims</h3>
-            {s.properties.length === 0 && <div className="small muted">You don't own any land yet.</div>}
-            {s.properties.map((x) => (
-              <div key={x.id} className={`prop-card ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
-                <b>{x.name}</b>
-                <div className="small muted">{REGIONS[x.region].name}</div>
-                <div className="small">
-                  {x.permit !== 'granted'
-                    ? `${x.knowledge.holes.length} holes · permit ${x.permit}`
-                    : // an underground-only mine has no pit to report on
-                      (!x.mine.shaft || x.mine.target.some((v) => v > 0)) && `Pit: ${x.mine.status}`}
-                </div>
-                {x.permit === 'granted' && pitBlocksRemaining(x.mine) > 0 && <div className="small muted">{pitBlocksRemaining(x.mine)} blocks left</div>}
-                {x.mine.shaft && <div className="small">⛫ Underground: {x.mine.ugStatus}</div>}
+
+  // ---- pieces shared by the desktop layout and the phone HUD ----
+
+  const claimsPanel = (
+    <div className="panel">
+      <h3>Your claims</h3>
+      {s.properties.length === 0 && <div className="small muted">You don't own any land yet.</div>}
+      {s.properties.map((x) => (
+        <div key={x.id} className={`prop-card ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
+          <b>{x.name}</b>
+          <div className="small muted">{REGIONS[x.region].name}</div>
+          <div className="small">
+            {x.permit !== 'granted'
+              ? `${x.knowledge.holes.length} holes · permit ${x.permit}`
+              : // an underground-only mine has no pit to report on
+                (!x.mine.shaft || x.mine.target.some((v) => v > 0)) && `Pit: ${x.mine.status}`}
+          </div>
+          {x.permit === 'granted' && pitBlocksRemaining(x.mine) > 0 && <div className="small muted">{pitBlocksRemaining(x.mine)} blocks left</div>}
+          {x.mine.shaft && <div className="small">⛫ Underground: {x.mine.ugStatus}</div>}
+        </div>
+      ))}
+      {sold.length > 0 && (
+        <>
+          <h4>Sold claims</h4>
+          {sold.map((x) => (
+            <div key={x.id} className={`prop-card sold ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
+              <b>{x.name}</b>
+              <div className="small muted">
+                {REGIONS[x.region].name} · sold day {x.soldDay}
               </div>
-            ))}
-            {sold.length > 0 && (
+              <div className="small">{x.knowledge.holes.length} holes drilled</div>
+            </div>
+          ))}
+        </>
+      )}
+      {s.gameOver && (s.properties.length > 0 || sold.length > 0) && (
+        <div className="small muted">Pick any claim, open the 3D view and tick "Show the truth" to see what was really down there.</div>
+      )}
+      {!s.gameOver && (
+        <button
+          className="wide-btn"
+          data-tut="land-office"
+          onClick={() => {
+            setSheet(null);
+            setOffice(true);
+          }}
+        >
+          🏛 Land Office ({s.listings.length})
+        </button>
+      )}
+    </div>
+  );
+
+  const welcome = (
+    <div className="welcome">
+      <h2>Welcome, prospector.</h2>
+      <p>
+        You have <b>{money(s.cash, false)}</b> and five years. Somewhere under these hills is gold, sitting in veins, creek
+        gravels, and bonanza pockets.
+      </p>
+      <ol>
+        <li>Buy a claim at the Land Office.</li>
+        <li>Read the ground: walk it, pan the creek, sample the soil.</li>
+        <li>Drill where the clues point. Assays take time.</li>
+        <li>Prove up a resource, get a permit, dig a pit, and pour gold.</li>
+        <li>Sell proven claims or mine them, then buy bigger ones.</li>
+      </ol>
+      {/* on phones the claim list is tucked in a sheet, so the tutorial points here instead */}
+      <button data-tut={mobile ? 'land-office' : undefined} onClick={() => setOffice(true)}>
+        🏛 Visit the Land Office
+      </button>
+    </div>
+  );
+
+  const threeDOptions = (
+    <>
+      <label className="row small">
+        <input type="checkbox" checked={xray} onChange={(e) => setXray(e.target.checked)} /> X-ray ground
+      </label>
+      <label className="row small">
+        <input type="checkbox" checked={showShell} onChange={(e) => setShowShell(e.target.checked)} /> Estimated ore shell
+      </label>
+      {s.gameOver && (
+        <label className="row small">
+          <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} /> Show the truth
+        </label>
+      )}
+    </>
+  );
+
+  const sliceControl = (overlay === 'estimate' || overlay === 'confidence') && (
+    <label className="slice small">
+      Depth: <b>{slice < 0 ? 'best in column' : `${slice * LAYER_M}–${(slice + 1) * LAYER_M} m`}</b>
+      <input type="range" min={-1} max={GRID_D - 1} value={slice} onChange={(e) => setSlice(Number(e.target.value))} />
+    </label>
+  );
+
+  const mapOrModel = (caption?: React.ReactNode) =>
+    p &&
+    (view === 'map' ? (
+      <MapCanvas
+        prop={p}
+        version={version}
+        overlay={overlay}
+        slice={slice}
+        tool={tool}
+        trenchStart={trenchStart}
+        selectedHole={holeId}
+        onCellClick={onCellClick}
+        onPaint={(c) =>
+          tool === 'stope'
+            ? store.dispatch({ type: 'setStopes', propId: p.id, cells: [c], zFrom: stopeRange[0], zTo: stopeRange[1] })
+            : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: pitDepth })
+        }
+        onHover={setHover}
+        onSelect={mobile ? setPending : undefined}
+        pending={pending}
+        marks={tutorialMarks(s, tutUi)}
+        caption={caption}
+      />
+    ) : (
+      <Reveal3D prop={p} version={version} cutoff={p.mine.cutoff} showShell={showShell} xray={xray} showTruth={showTruth && !!s.gameOver} />
+    ));
+
+  const tabPanel = (t: RightTab) =>
+    p && (
+      <>
+        {t === 'mine' && <MinePanel s={s} p={p} tool={tool} setTool={selectTool} pitDepth={pitDepth} setPitDepth={setPitDepth} stopeRange={stopeRange} setStopeRange={setStopeRange} />}
+        {t === 'report' && <ReportPanel s={s} p={p} />}
+        {t === 'bank' && <BankPanel s={s} />}
+        {t === 'awards' && <Achievements s={s} />}
+      </>
+    );
+
+  const onWalkAll = () => p && store.dispatch({ type: 'walkoverAll', propId: p.id });
+  const onGeophys = () => p && store.dispatch({ type: 'geophys', propId: p.id });
+
+  // ---- desktop: three columns (unchanged) ----
+
+  const desktop = (
+    <div className="main">
+      <aside className="left">
+        {claimsPanel}
+        {p && (
+          <DrillHoleList
+            p={p}
+            selected={hole?.id ?? null}
+            onSelect={(id) => {
+              setHoleId(id);
+              setTab('explore');
+            }}
+          />
+        )}
+      </aside>
+
+      <section className="center">
+        {p ? (
+          <>
+            <div className="view-bar">
+              <div className="seg">
+                <button data-tut="view-map" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>
+                  Map
+                </button>
+                <button data-tut="view-3d" className={view === '3d' ? 'active' : ''} onClick={() => setView('3d')}>
+                  3D
+                </button>
+              </div>
+              {view === 'map' ? (
+                <div className="seg">
+                  {OVERLAYS.map((o) => (
+                    <button key={o.id} data-tut={`overlay-${o.id}`} className={overlay === o.id ? 'active' : ''} onClick={() => setOverlay(o.id)}>
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="seg">{threeDOptions}</div>
+              )}
+            </div>
+            {view === 'map' && sliceControl}
+            {mapOrModel()}
+          </>
+        ) : (
+          welcome
+        )}
+      </section>
+
+      <aside className="right">
+        {p && (
+          <>
+            <div className="seg tabs">
+              {(['explore', 'mine', 'report', 'bank', 'awards'] as RightTab[]).map((t) => (
+                <button key={t} data-tut={`tab-${t}`} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+                  {t[0].toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+            {tab === 'explore' && (
               <>
-                <h4>Sold claims</h4>
-                {sold.map((x) => (
-                  <div key={x.id} className={`prop-card sold ${p?.id === x.id ? 'sel' : ''}`} onClick={() => pickClaim(x.id)}>
-                    <b>{x.name}</b>
-                    <div className="small muted">
-                      {REGIONS[x.region].name} · sold day {x.soldDay}
-                    </div>
-                    <div className="small">{x.knowledge.holes.length} holes drilled</div>
+                <ExplorePanel
+                  s={s}
+                  p={p}
+                  tool={tool}
+                  setTool={selectTool}
+                  drillDepth={drillDepth}
+                  setDrillDepth={setDrillDepth}
+                  rush={rush}
+                  setRush={setRush}
+                  onGeophys={onGeophys}
+                  onWalkAll={onWalkAll}
+                />
+                <CellInfo p={p} c={hover} slice={slice} />
+                {hole && (
+                  <div className="panel">
+                    <CoreLog p={p} hole={hole} />
                   </div>
-                ))}
+                )}
               </>
             )}
-            {s.gameOver && (s.properties.length > 0 || sold.length > 0) && (
-              <div className="small muted">Pick any claim, open the 3D view and tick "Show the truth" to see what was really down there.</div>
-            )}
-            {!s.gameOver && (
-              <button className="wide-btn" data-tut="land-office" onClick={() => setOffice(true)}>
-                🏛 Land Office ({s.listings.length})
-              </button>
-            )}
-          </div>
-          {p && (
+            {tab !== 'explore' && tabPanel(tab)}
+            {tab !== 'explore' && <CellInfo p={p} c={hover} slice={slice} />}
+          </>
+        )}
+        {!p && <BankPanel s={s} />}
+      </aside>
+    </div>
+  );
+
+  // ---- phone: one screen, no scrolling (status bar, chips, map, tool strip, time bar) ----
+
+  const layerName = view === '3d' ? '3D options' : (OVERLAYS.find((o) => o.id === overlay)?.name ?? 'Surface');
+  const moreTab: RightTab = tab === 'explore' ? 'mine' : tab;
+  const tapText = p && pending !== null ? describeTap(tool, pending, trenchStart, drillDepth, rush) : null;
+
+  const phone = (
+    <div className="hud">
+      <div className="hud-chips">
+        <button className="chip claim-chip" data-tut-host="land-office" onClick={() => setSheet('claims')}>
+          {p ? p.name : 'No claim yet'} ▾
+        </button>
+        {p && (
+          <>
+            <button className="chip" data-tut-host="overlay-" onClick={() => setSheet('layers')}>
+              {layerName} ▾
+            </button>
+            <button className="chip" data-tut={view === 'map' ? 'view-3d' : 'view-map'} onClick={() => setView(view === 'map' ? '3d' : 'map')}>
+              {view === 'map' ? '3D' : 'Map'}
+            </button>
+          </>
+        )}
+      </div>
+      <div className="hud-map">
+        {p
+          ? mapOrModel(
+              <CellInfo
+                p={p}
+                c={hover}
+                slice={slice}
+                compact
+                onOpenHole={(id) => {
+                  setHoleId(id);
+                  setSheet('hole');
+                }}
+              />,
+            )
+          : welcome}
+      </div>
+      {p && view === 'map' && (
+        <ToolStrip
+          tool={tool}
+          setTool={selectTool}
+          walkDone={walkAllDone(p)}
+          geoDone={geophysDone(p)}
+          onWalkAll={() => setPendingAction({ text: `🗺 Full walk-over · ${money(COSTS.walkoverAll.cost)} · ${COSTS.walkoverAll.days}d`, run: onWalkAll })}
+          onGeophys={() => setPendingAction({ text: `📡 IP geophysics · ${money(COSTS.geophys.cost)} · ${COSTS.geophys.days}d`, run: onGeophys })}
+        />
+      )}
+      <TimeBar moreOpen={sheet === 'more'} onMore={() => setSheet(sheet === 'more' ? null : 'more')} />
+
+      {sheet === 'claims' && (
+        <Sheet title="Claims" onClose={() => setSheet(null)}>
+          {claimsPanel}
+        </Sheet>
+      )}
+      {sheet === 'layers' && p && (
+        <Sheet title={view === '3d' ? '3D view' : 'Map layer'} onClose={() => setSheet(null)}>
+          {view === '3d' ? (
+            <div className="sheet-list">{threeDOptions}</div>
+          ) : (
+            <>
+              <div className="sheet-list">
+                {OVERLAYS.map((o) => (
+                  <button key={o.id} data-tut={`overlay-${o.id}`} className={`seg-item ${overlay === o.id ? 'active' : ''}`} onClick={() => setOverlay(o.id)}>
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+              {sliceControl}
+            </>
+          )}
+        </Sheet>
+      )}
+      {sheet === 'more' && p && (
+        <Sheet
+          title={
+            <div className="seg tabs">
+              {MORE_TABS.map(([t, name]) => (
+                <button key={t} data-tut={`tab-${t}`} className={moreTab === t ? 'active' : ''} onClick={() => setTab(t)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          }
+          onClose={() => setSheet(null)}
+        >
+          {tabPanel(moreTab)}
+          {moreTab === 'mine' && (
             <DrillHoleList
               p={p}
               selected={hole?.id ?? null}
               onSelect={(id) => {
                 setHoleId(id);
-                setTab('explore');
-                if (mobile) setPane('actions');
+                setSheet('hole');
               }}
             />
           )}
-        </aside>
+        </Sheet>
+      )}
+      {sheet === 'hole' && p && hole && (
+        <Sheet title="Core log" onClose={() => setSheet(null)}>
+          <CoreLog p={p} hole={hole} />
+        </Sheet>
+      )}
 
-        <section className="center" data-pane-id="map">
-          {p ? (
-            <>
-              <div className="view-bar">
-                <div className="seg">
-                  <button data-tut="view-map" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>
-                    Map
-                  </button>
-                  <button data-tut="view-3d" className={view === '3d' ? 'active' : ''} onClick={() => setView('3d')}>
-                    3D
-                  </button>
-                </div>
-                {view === 'map' ? (
-                  <div className="seg">
-                    {OVERLAYS.map((o) => (
-                      <button key={o.id} data-tut={`overlay-${o.id}`} className={overlay === o.id ? 'active' : ''} onClick={() => setOverlay(o.id)}>
-                        {o.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="seg">
-                    <label className="row small">
-                      <input type="checkbox" checked={xray} onChange={(e) => setXray(e.target.checked)} /> X-ray ground
-                    </label>
-                    <label className="row small">
-                      <input type="checkbox" checked={showShell} onChange={(e) => setShowShell(e.target.checked)} /> Estimated ore shell
-                    </label>
-                    {s.gameOver && (
-                      <label className="row small">
-                        <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} /> Show the truth
-                      </label>
-                    )}
-                  </div>
-                )}
-              </div>
-              {view === 'map' && (overlay === 'estimate' || overlay === 'confidence') && (
-                <label className="slice small">
-                  Depth: <b>{slice < 0 ? 'best in column' : `${slice * LAYER_M}–${(slice + 1) * LAYER_M} m`}</b>
-                  <input type="range" min={-1} max={GRID_D - 1} value={slice} onChange={(e) => setSlice(Number(e.target.value))} />
-                </label>
-              )}
-              {view === 'map' ? (
-                <MapCanvas
-                  prop={p}
-                  version={version}
-                  overlay={overlay}
-                  slice={slice}
-                  tool={tool}
-                  trenchStart={trenchStart}
-                  selectedHole={holeId}
-                  onCellClick={onCellClick}
-                  onPaint={(c) =>
-                    tool === 'stope'
-                      ? store.dispatch({ type: 'setStopes', propId: p.id, cells: [c], zFrom: stopeRange[0], zTo: stopeRange[1] })
-                      : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: pitDepth })
-                  }
-                  onHover={setHover}
-                  onSelect={mobile ? setPending : undefined}
-                  pending={pending}
-                  marks={tutorialMarks(s, tutUi)}
-                />
-              ) : (
-                <Reveal3D prop={p} version={version} cutoff={p.mine.cutoff} showShell={showShell} xray={xray} showTruth={showTruth && !!s.gameOver} />
-              )}
-              {mobile && view === 'map' && <CellInfo p={p} c={hover} slice={slice} />}
-              <Legend />
-            </>
-          ) : (
-            <div className="welcome">
-              <h2>Welcome, prospector.</h2>
-              <p>
-                You have <b>{money(s.cash, false)}</b> and five years. Somewhere under these hills is gold, sitting in veins, creek
-                gravels, and bonanza pockets.
-              </p>
-              <ol>
-                <li>Buy a claim at the Land Office.</li>
-                <li>Read the ground: walk it, pan the creek, sample the soil.</li>
-                <li>Drill where the clues point. Assays take time.</li>
-                <li>Prove up a resource, get a permit, dig a pit, and pour gold.</li>
-                <li>Sell proven claims or mine them, then buy bigger ones.</li>
-              </ol>
-              <button onClick={() => setOffice(true)}>🏛 Visit the Land Office</button>
-            </div>
-          )}
-        </section>
+      {tapText && pending !== null && (
+        <ConfirmBar
+          label={columnLabel(pending)}
+          text={tapText}
+          onConfirm={() => {
+            onCellClick(pending);
+            setPending(null);
+          }}
+          onCancel={() => setPending(null)}
+        >
+          {tool === 'drill' && <DrillOptions depth={drillDepth} setDepth={setDrillDepth} rush={rush} setRush={setRush} />}
+        </ConfirmBar>
+      )}
+      {pendingAction && !tapText && (
+        <ConfirmBar
+          text={pendingAction.text}
+          onConfirm={() => {
+            pendingAction.run();
+            setPendingAction(null);
+          }}
+          onCancel={() => setPendingAction(null)}
+        />
+      )}
+    </div>
+  );
 
-        <aside className="right" data-pane-id="actions">
-          {p && (
-            <>
-              <div className="seg tabs">
-                {(['explore', 'mine', 'report', 'bank', 'awards'] as RightTab[]).map((t) => (
-                  <button key={t} data-tut={`tab-${t}`} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-                    {t[0].toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-              {tab === 'explore' && (
-                <>
-                  <ExplorePanel
-                    s={s}
-                    p={p}
-                    tool={tool}
-                    setTool={selectTool}
-                    drillDepth={drillDepth}
-                    setDrillDepth={setDrillDepth}
-                    rush={rush}
-                    setRush={setRush}
-                    onGeophys={() => store.dispatch({ type: 'geophys', propId: p.id })}
-                    onWalkAll={() => store.dispatch({ type: 'walkoverAll', propId: p.id })}
-                  />
-                  <CellInfo p={p} c={hover} slice={slice} />
-                  {hole && (
-                    <div className="panel">
-                      <CoreLog p={p} hole={hole} />
-                    </div>
-                  )}
-                </>
-              )}
-              {tab === 'mine' && <MinePanel s={s} p={p} tool={tool} setTool={selectTool} pitDepth={pitDepth} setPitDepth={setPitDepth} stopeRange={stopeRange} setStopeRange={setStopeRange} />}
-              {tab === 'report' && <ReportPanel s={s} p={p} />}
-              {tab === 'bank' && <BankPanel s={s} />}
-              {tab === 'awards' && <Achievements s={s} />}
-              {tab !== 'explore' && <CellInfo p={p} c={hover} slice={slice} />}
-            </>
-          )}
-          {!p && <BankPanel s={s} />}
-        </aside>
-      </div>
+  // The tutorial opens the matching sheet on phones (explore steps use the tool strip, so close it).
+  const coachSetTab = mobile
+    ? (t: RightTab) => {
+        setTab(t);
+        setSheet(t === 'explore' ? null : 'more');
+      }
+    : setTab;
+
+  return (
+    <div className={mobile ? 'app mobile-hud' : 'app'}>
+      <TopBar s={s} onQuit={() => store.quit()} />
+      {mobile ? phone : desktop}
 
       {office && <LandOffice s={s} onClose={() => setOffice(false)} />}
       <NoticeModal s={s} />
@@ -329,39 +530,7 @@ export function App() {
           )}
         />
       )}
-      {mobile && p && pending !== null && (
-        <ConfirmBar
-          cell={pending}
-          tool={tool}
-          trenchStart={trenchStart}
-          drillDepth={drillDepth}
-          rush={rush}
-          onConfirm={() => {
-            onCellClick(pending);
-            setPending(null);
-          }}
-          onCancel={() => setPending(null)}
-        />
-      )}
-      {mobile && (
-        <nav className="mobile-nav">
-          {(
-            [
-              ['claims', '⛏', 'Claims'],
-              ['map', '🗺', 'Map'],
-              ['actions', '🧰', 'Actions'],
-            ] as [Pane, string, string][]
-          ).map(([id, icon, name]) => (
-            <button key={id} className={pane === id ? 'active' : ''} onClick={() => setPane(id)}>
-              <span>{icon}</span>
-              {name}
-            </button>
-          ))}
-        </nav>
-      )}
-      {s.tutorial && !s.tutorial.done && (
-        <TutorialCoach s={s} ui={tutUi} setTab={setTab} setOverlay={setOverlay} setPane={mobile ? setPane : undefined} />
-      )}
+      {s.tutorial && !s.tutorial.done && <TutorialCoach s={s} ui={tutUi} setTab={coachSetTab} setOverlay={setOverlay} />}
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
     </div>
   );
@@ -370,31 +539,4 @@ export function App() {
 function GameOverModalGate({ render }: { render: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return open ? <>{render(() => setOpen(false))}</> : null;
-}
-
-const LEGEND_CLUES: [Clue, string][] = [
-  [Clue.Outcrop, 'outcrop'],
-  [Clue.QuartzOutcrop, 'quartz'],
-  [Clue.VisibleGold, 'visible gold'],
-  [Clue.Gossan, 'gossan'],
-  [Clue.VegStress, 'stressed veg'],
-  [Clue.OldWorkings, 'old workings'],
-];
-
-function Legend() {
-  return (
-    <div className="legend small">
-      {LEGEND_CLUES.map(([c, name]) => (
-        <span key={c}>
-          <ClueIcon clue={c} /> {name}
-        </span>
-      ))}
-      <span>
-        <i className="lg hole" /> drill hole (colour = best grade)
-      </span>
-      <span className="ramp">
-        0.05 <i /> 20 g/t
-      </span>
-    </div>
-  );
 }

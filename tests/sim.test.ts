@@ -63,6 +63,24 @@ describe('reducer', () => {
     const r = applyCommand(s, { type: 'buyListing', listingId: s.listings[0].id });
     expect(r.ok).toBe(false);
   });
+
+  it('allows one full walk-over and one IP survey per claim', () => {
+    const s = newGame(5);
+    applyCommand(s, { type: 'buyListing', listingId: s.listings[0].id });
+    const p = s.properties[0];
+    s.cash = 1_000_000;
+    expect(applyCommand(s, { type: 'walkoverAll', propId: p.id }).ok).toBe(true);
+    expect(applyCommand(s, { type: 'geophys', propId: p.id }).ok).toBe(true);
+    // while running
+    expect(applyCommand(s, { type: 'walkoverAll', propId: p.id }).ok).toBe(false);
+    expect(applyCommand(s, { type: 'geophys', propId: p.id }).ok).toBe(false);
+    // and after they finish (and their jobs age out of the list)
+    while (s.day < 80) applyCommand(s, { type: 'advance', days: 80 - s.day });
+    const cash = s.cash;
+    expect(applyCommand(s, { type: 'walkoverAll', propId: p.id }).ok).toBe(false);
+    expect(applyCommand(s, { type: 'geophys', propId: p.id }).ok).toBe(false);
+    expect(s.cash).toBe(cash);
+  });
 });
 
 describe('estimate', () => {

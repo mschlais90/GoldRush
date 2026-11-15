@@ -31,6 +31,8 @@ import {
   soilGridCells,
   soilSample,
   trenchCells,
+  geophysDone,
+  walkAllDone,
 } from './prospecting';
 import { REGIONS, REGION_ORDER } from './regions';
 import { Rng } from './rng';
@@ -258,6 +260,7 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
     case 'walkoverAll': {
       const p = prop(s, cmd.propId);
       if (!p) return fail('No such property.');
+      if (cmd.type === 'walkoverAll' && walkAllDone(p)) return fail('The whole claim is already mapped (or being mapped).');
       const spec = cmd.type === 'walkover' ? COSTS.walkover : COSTS.walkoverAll;
       if (!spend(s, p, spec.cost, 'explore')) return fail('Not enough cash.');
       const start = laneStart(s, p, 'field');
@@ -294,7 +297,7 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
     case 'geophys': {
       const p = prop(s, cmd.propId);
       if (!p) return fail('No such property.');
-      if (p.knowledge.geophys || p.jobs.some((j) => j.kind === 'geophys' && !j.done)) return fail('Survey already done or in progress.');
+      if (geophysDone(p)) return fail('Survey already done or in progress.');
       if (!spend(s, p, COSTS.geophys.cost, 'explore')) return fail('Not enough cash.');
       const start = laneStart(s, p, 'contractor');
       const end = start + COSTS.geophys.days;

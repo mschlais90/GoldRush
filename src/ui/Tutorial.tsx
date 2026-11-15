@@ -1,5 +1,5 @@
 // Tutorial coach: a step list with highlight targets, map beacons and completion checks.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { endTutorial } from '../sim/game';
 import { pitForecast } from '../sim/forecast';
 import { Clue, LAYER_M } from '../sim/geology/types';
@@ -8,7 +8,6 @@ import type { GameState, Property } from '../sim/state';
 import { suggestedPitCells, tutorialPlan, type TutorialPlan } from '../sim/tutorial';
 import type { Overlay } from './map/MapCanvas';
 import { store } from './store';
-import type { Pane } from './useIsMobile';
 
 export type RightTab = 'explore' | 'mine' | 'report' | 'bank' | 'awards';
 
@@ -72,7 +71,7 @@ const STEPS: Step[] = [
   {
     title: 'Read the ground',
     body: () =>
-      "The map is now full of clues. **White crystals** are quartz outcrops, and gold often rides in quartz veins. **Gold sparkles** mean visible gold. **Rust-red patches** (gossan) and **dead shrubs** hint at mineralisation below. **Mine-adit icons** are old-timers' diggings: they found something. The beacons mark the most interesting clues. The legend under the map lists them all.",
+      "The map is now full of clues. **White crystals** are quartz outcrops, and gold often rides in quartz veins. **Gold sparkles** mean visible gold. **Rust-red patches** (gossan) and **dead shrubs** hint at mineralisation below. **Mine-adit icons** are old-timers' diggings: they found something. The beacons mark the most interesting clues. Hover over or tap any cell to see what it is.",
     marks: (c) => {
       if (!c.p) return [];
       const out: number[] = [];
@@ -250,14 +249,11 @@ export function TutorialCoach({
   ui,
   setTab,
   setOverlay,
-  setPane,
 }: {
   s: GameState;
   ui: TutorialUi;
   setTab: (t: RightTab) => void;
   setOverlay: (o: Overlay) => void;
-  /** Phone layout only: switch the visible pane. */
-  setPane?: (p: Pane) => void;
 }) {
   const ctx = useCtx(s, ui);
   const [collapsed, setCollapsed] = useState(false);
@@ -285,16 +281,13 @@ export function TutorialCoach({
 
   // highlight the element the player should use
   const target = step.target?.(ctx);
-  const shownTarget = useRef<string | null>(null);
   useEffect(() => {
     if (!target) return;
-    const els = [...document.querySelectorAll(`[data-tut="${target}"]`)];
-    // Phone: bring the target's pane on screen, once per target so the player can still navigate away.
-    if (setPane && shownTarget.current !== target) {
-      shownTarget.current = target;
-      const pane = els[0]?.closest('[data-pane-id]')?.getAttribute('data-pane-id');
-      if (pane) setPane(pane as Pane);
-    }
+    const visible = (e: Element) => (e as HTMLElement).offsetParent !== null || getComputedStyle(e).position === 'fixed';
+    let els = [...document.querySelectorAll(`[data-tut="${target}"]`)].filter(visible);
+    // Phone HUD: when the control is tucked inside a closed menu, glow the chip that opens it
+    // (marked with data-tut-host = the target, or a prefix of it such as "overlay-").
+    if (!els.length) els = [...document.querySelectorAll('[data-tut-host]')].filter((e) => target.startsWith(e.getAttribute('data-tut-host')!) && visible(e));
     els.forEach((e) => e.classList.add('tut-glow'));
     if (els[0] && 'scrollIntoView' in els[0]) (els[0] as HTMLElement).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return () => els.forEach((e) => e.classList.remove('tut-glow'));

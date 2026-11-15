@@ -431,47 +431,6 @@ input[type='number'] {
   opacity: 0.35;
 }
 
-.legend {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  color: var(--muted);
-  align-items: center;
-}
-.lg {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  vertical-align: middle;
-}
-.lg.outcrop {
-  background: #969696;
-}
-.lg.quartz {
-  background: #f4f4f4;
-  transform: rotate(45deg);
-}
-.lg.vg {
-  background: #ffd700;
-  transform: rotate(45deg);
-}
-.lg.gossan {
-  background: #b5481f;
-  border-radius: 50%;
-}
-.lg.hole {
-  background: var(--gold);
-  border-radius: 50%;
-  border: 1px solid #000;
-}
-.ramp i {
-  display: inline-block;
-  width: 80px;
-  height: 8px;
-  vertical-align: middle;
-  background: linear-gradient(90deg, #46464e, #785a3c, #be6e28, #eba01e, #ffd73c, #fffac8);
-}
-
 /* ---------- panels ---------- */
 .tools {
   display: grid;
@@ -1014,7 +973,8 @@ button.pulse {
 }
 @media (max-width: 760px) {
   :root {
-    --nav-h: calc(56px + env(safe-area-inset-bottom));
+    --nav-h: calc(52px + env(safe-area-inset-bottom));
+    --strip-h: 54px;
   }
   button,
   input,
@@ -1022,92 +982,252 @@ button.pulse {
   canvas {
     touch-action: manipulation;
   }
+
+  /* one screen, nothing scrolls: status bar, chips, map, tool strip, time bar */
   .app {
     height: 100dvh;
+    overflow: hidden;
+  }
+  .hud {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
-  /* top bar: essentials only, time controls on their own row */
+  /* status bar: a single row */
   .topbar {
-    gap: 4px 12px;
-    padding: 6px 10px;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: max(6px, env(safe-area-inset-top)) 10px 6px;
+    overflow: hidden;
   }
   .topbar .brand,
   .topbar .spark,
-  .topbar .gold-price {
+  .topbar .gold-price,
+  .topbar .stat .sub {
     display: none;
   }
   .stat {
     font-size: 13px;
+    min-width: 0;
+    white-space: nowrap;
   }
   .stat.big span:nth-child(2) {
     font-size: 15px;
   }
-  /* second row: ☰ then the three time buttons, always together */
-  .topbar::before {
-    content: '';
-    order: 8;
-    flex-basis: 100%;
-    height: 0;
-    margin-top: -4px; /* cancel the extra row gap this zero-height line adds */
-  }
   .topbar .menu-btn {
-    order: 9;
-    min-height: 38px;
+    margin-left: auto;
+    min-height: 36px;
     padding: 0 12px;
   }
-  .advance {
-    order: 10;
-    flex: 1 1 0;
-    min-width: 0;
-    margin-left: 0;
-    gap: 4px;
+
+  /* claim / layer / 3D chips */
+  .hud-chips {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
   }
-  .advance button {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 38px;
-    padding: 0 4px;
+  .chip {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 17px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--text);
     font-size: 13px;
+    font-weight: 500;
     white-space: nowrap;
   }
+  .chip.claim-chip {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
 
-  /* one pane at a time */
-  .main {
-    display: block;
-    overflow-y: auto;
-    padding-bottom: var(--nav-h);
-  }
-  .main[data-pane] > [data-pane-id] {
-    display: none;
-  }
-  .main[data-pane='claims'] > [data-pane-id='claims'],
-  .main[data-pane='map'] > [data-pane-id='map'],
-  .main[data-pane='actions'] > [data-pane-id='actions'] {
-    display: flex;
-  }
-  .left,
-  .right,
-  .center {
-    overflow: visible;
-    padding: 8px;
-  }
-  .map-wrap {
-    flex: none;
+  /* map fills whatever height is left */
+  .hud-map {
+    flex: 1;
     min-height: 0;
-    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 8px;
+  }
+  .hud-map .map-wrap {
+    flex: 1;
+    min-height: 0;
+    align-items: center;
   }
   .map-wrap canvas {
     touch-action: none;
   }
-  .view3d {
-    min-height: 60vh;
-  }
-  .slice input {
-    max-width: none;
+  .hud-map .view3d {
     flex: 1;
+    min-height: 0;
+  }
+  .hud-map .welcome {
+    margin: 8px auto;
+    overflow-y: auto;
+  }
+  .cell-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(11, 15, 26, 0.84);
+    border-top: 1px solid rgba(242, 193, 78, 0.25);
+  }
+  .cell-caption-rows {
+    flex: 1;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cell-caption.open .cell-caption-rows {
+    -webkit-line-clamp: unset;
+  }
+  .cell-caption canvas {
+    vertical-align: -3px;
   }
 
-  /* bigger tap targets */
+  /* tool strip */
+  .tool-strip {
+    display: flex;
+    gap: 2px;
+    height: var(--strip-h);
+    padding: 4px 6px;
+  }
+  .tool-strip button {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tool-strip button span {
+    font-size: 19px;
+    line-height: 1.1;
+  }
+  .tool-strip button.active {
+    color: var(--gold);
+    border-color: rgba(242, 193, 78, 0.6);
+    background: rgba(242, 193, 78, 0.1);
+  }
+  .tool-strip button:disabled {
+    opacity: 0.35;
+  }
+  .tool-strip .strip-chip {
+    flex-direction: row;
+    font-size: 14px;
+  }
+
+  /* time bar */
+  .mobile-nav {
+    display: flex;
+    height: var(--nav-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #12161b;
+    border-top: 1px solid rgba(242, 193, 78, 0.25);
+  }
+  .mobile-nav button {
+    flex: 1 1 0;
+    min-width: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .mobile-nav button + button {
+    border-left: 1px solid var(--line);
+  }
+  .mobile-nav button.more {
+    color: var(--gold);
+  }
+  .mobile-nav button.more.active {
+    background: rgba(242, 193, 78, 0.12);
+  }
+
+  /* sheets slide up over the map, stopping above the time bar */
+  .sheet-bg {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: var(--nav-h);
+    z-index: 7;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .sheet {
+    width: 100%;
+    max-height: 78%;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-top: 1px solid rgba(242, 193, 78, 0.35);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  }
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-head > b {
+    flex: 1;
+    min-width: 0;
+  }
+  .sheet-body {
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sheet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .seg-item {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .seg-item.active {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* bigger tap targets inside sheets */
   .seg button,
   .tool,
   .tool-sm {
@@ -1116,53 +1236,29 @@ button.pulse {
   .seg.tabs button {
     padding: 5px 4px;
   }
-
-  .mobile-nav {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 8;
-    display: flex;
-    height: var(--nav-h);
-    padding-bottom: env(safe-area-inset-bottom);
-    background: #12161b;
-    border-top: 1px solid rgba(242, 193, 78, 0.25);
-  }
-  .mobile-nav button {
+  .slice input {
+    max-width: none;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    background: none;
-    border: none;
-    border-radius: 0;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  .mobile-nav button span {
-    font-size: 20px;
-  }
-  .mobile-nav button.active {
-    color: var(--gold);
   }
 
+  /* confirm bar floats above the tool strip */
   .confirm-bar {
     position: fixed;
     left: 8px;
     right: 8px;
-    bottom: calc(var(--nav-h) + 8px);
+    bottom: calc(var(--nav-h) + var(--strip-h) + 6px);
     z-index: 9;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: block;
     padding: 10px 12px;
     background: #161b21;
     border: 1px solid var(--gold);
     border-radius: 12px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+  .confirm-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .confirm-text {
     flex: 1;
@@ -1174,8 +1270,18 @@ button.pulse {
   .confirm-bar button {
     min-height: 40px;
   }
+  .confirm-opts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .confirm-opts .small-btn {
+    min-width: 40px;
+  }
 
-  /* overlays clear the nav bar */
+  /* modals, coach and toasts clear the bottom controls */
   .modal {
     max-height: 85dvh;
     padding: 14px;
@@ -1194,21 +1300,20 @@ button.pulse {
     left: 8px;
     right: 8px;
     width: auto;
-    bottom: calc(var(--nav-h) + 8px);
-    max-height: 45dvh;
+    bottom: calc(var(--nav-h) + var(--strip-h) + 6px);
+    max-height: 38dvh;
     overflow-y: auto;
   }
   .coach-pill {
     left: 8px;
-    bottom: calc(var(--nav-h) + 8px);
+    bottom: calc(var(--nav-h) + var(--strip-h) + 6px);
   }
   .toast {
-    bottom: calc(var(--nav-h) + 12px);
+    bottom: calc(var(--nav-h) + var(--strip-h) + 12px);
     max-width: calc(100vw - 24px);
   }
 
-  /* title screen */
-  /* title and buttons sit up in the sky so the camp and sluice below stay visible */
+  /* title screen: title and buttons sit up in the sky so the camp and sluice below stay visible */
   .title-content {
     justify-content: flex-start;
     padding: calc(10dvh + env(safe-area-inset-top)) 16px 24px;
