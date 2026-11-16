@@ -35,6 +35,8 @@ interface Props {
   pending?: number | null;
   /** Tutorial beacons: cells to point the player at. */
   marks?: number[];
+  /** Touch only, pit/stope tools: 'move' makes one finger pan and inspect instead of painting. */
+  paintMode?: 'move' | 'paint';
 }
 
 /** Tools whose tap on touch acts immediately because they cost nothing. */
@@ -203,7 +205,9 @@ export function MapCanvas(p: Props) {
     touchSel.current = true;
     setHover(c);
     p.onHover(c);
-    if (isFreeTap(p.tool, p.trenchStart) || !p.onSelect) p.onCellClick(c);
+    if (PAINT_TOOLS.includes(p.tool)) {
+      // move mode with a mine tool: the tap only inspects the cell
+    } else if (isFreeTap(p.tool, p.trenchStart) || !p.onSelect) p.onCellClick(c);
     else p.onSelect(c);
     paint();
   };
@@ -331,7 +335,7 @@ export function MapCanvas(p: Props) {
               return;
             }
             if (c === null) return;
-            if (PAINT_TOOLS.includes(p.tool)) {
+            if (PAINT_TOOLS.includes(p.tool) && p.paintMode !== 'move') {
               painting.current = true;
               p.onPaint(c);
               return;

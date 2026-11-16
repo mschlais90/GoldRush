@@ -18,3 +18,8 @@ export function useIsMobile(): boolean {
     () => false,
   );
 }
+
+/** Non-hook check for plain functions (e.g. tutorial text). */
+export function isPhone(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia(QUERY).matches;
+}

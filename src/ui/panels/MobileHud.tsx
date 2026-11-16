@@ -1,5 +1,6 @@
 // Phone-only HUD pieces: bottom sheets, the tool strip, and the time bar.
 import type { ReactNode } from 'react';
+import { LAYER_M } from '../../sim/geology/types';
 import { COSTS } from '../../sim/prospecting';
 import { money } from '../format';
 import type { Tool } from '../map/MapCanvas';
@@ -32,7 +33,7 @@ const STRIP: { id: Tool; icon: ReactNode; label: string; title: string }[] = [
   { id: 'drill', icon: '🛢', label: 'Drill', title: 'Core drill' },
 ];
 
-const TOOL_NAMES: Partial<Record<Tool, string>> = { pit: '⛏ Painting pit', stope: '⛫ Planning stopes', shaft: '⛫ Placing shaft' };
+const TOOL_NAMES: Partial<Record<Tool, string>> = { shaft: '⛫ Placing shaft' };
 
 /** One row of tool icons under the map; mine tools (picked from the Mine sheet) show as a dismissible chip. */
 export function ToolStrip(p: { tool: Tool; setTool: (t: Tool) => void; onWalkAll: () => void; onGeophys: () => void; walkDone: boolean; geoDone: boolean }) {
@@ -62,6 +63,97 @@ export function ToolStrip(p: { tool: Tool; setTool: (t: Tool) => void; onWalkAll
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+export type DesignMode = 'move' | 'dig' | 'erase';
+
+function Stepper(p: { label: string; value: string; onDown: () => void; onUp: () => void; downOff: boolean; upOff: boolean }) {
+  return (
+    <span className="stepper">
+      <span className="small muted">{p.label}</span>
+      <button className="secondary" onClick={p.onDown} disabled={p.downOff} aria-label={`${p.label} shallower`}>
+        −
+      </button>
+      <b className="fixed-num">{p.value}</b>
+      <button className="secondary" onClick={p.onUp} disabled={p.upOff} aria-label={`${p.label} deeper`}>
+        +
+      </button>
+    </span>
+  );
+}
+
+/** Replaces the tool strip while planning a pit or stopes: move/dig toggle, depth steppers and a live summary. */
+export function DesignBar(p: {
+  tool: 'pit' | 'stope';
+  mode: DesignMode;
+  setMode: (m: DesignMode) => void;
+  hint: boolean;
+  pitDepth: number;
+  setPitDepth: (n: number) => void;
+  stopeRange: [number, number];
+  setStopeRange: (r: [number, number]) => void;
+  summary: ReactNode;
+  onForecast: () => void;
+  onDone: () => void;
+}) {
+  const modes: [DesignMode, string][] = [
+    ['move', '✋ Move'],
+    ['dig', p.tool === 'pit' ? '✏ Dig' : '⛏ Stope'],
+  ];
+  if (p.tool === 'pit') modes.push(['erase', '⌫ Erase']);
+  const [from, to] = p.stopeRange;
+  return (
+    <div className="design-bar">
+      <div className="design-row">
+        <div className="seg">
+          {modes.map(([m, name]) => (
+            <button key={m} className={p.mode === m ? 'active' : ''} onClick={() => p.setMode(m)}>
+              {name}
+            </button>
+          ))}
+        </div>
+        <button className="done-btn" onClick={p.onDone}>
+          Done ✓
+        </button>
+      </div>
+      <div className="design-row">
+        {p.tool === 'pit' ? (
+          <Stepper
+            label="Floor"
+            value={`${p.pitDepth * LAYER_M} m`}
+            onDown={() => p.setPitDepth(Math.max(1, p.pitDepth - 1))}
+            onUp={() => p.setPitDepth(Math.min(24, p.pitDepth + 1))}
+            downOff={p.pitDepth <= 1}
+            upOff={p.pitDepth >= 24}
+          />
+        ) : (
+          <>
+            <Stepper
+              label="From"
+              value={`${from * LAYER_M} m`}
+              onDown={() => p.setStopeRange([from - 1, to])}
+              onUp={() => p.setStopeRange([from + 1, Math.max(from + 1, to)])}
+              downOff={from <= 0}
+              upOff={from >= 23}
+            />
+            <Stepper
+              label="To"
+              value={`${(to + 1) * LAYER_M} m`}
+              onDown={() => p.setStopeRange([Math.min(from, to - 1), to - 1])}
+              onUp={() => p.setStopeRange([from, to + 1])}
+              downOff={to <= 0}
+              upOff={to >= 23}
+            />
+          </>
+        )}
+        {p.hint && p.mode !== 'move' && <span className="small muted design-hint">Two fingers to move</span>}
+      </div>
+      <button className="design-summary small" onClick={p.onForecast}>
+        <span>{p.summary}</span>
+        <span className="muted">Forecast ›</span>
+      </button>
     </div>
   );
 }

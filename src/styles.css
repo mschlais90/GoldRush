@@ -1152,6 +1152,72 @@ button.pulse {
     font-size: 14px;
   }
 
+  /* pit / stope design bar (replaces the tool strip; overlays above it use the taller height) */
+  .mobile-hud.designing {
+    --strip-h: 124px;
+  }
+  .design-bar {
+    box-sizing: border-box;
+    height: var(--strip-h);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+  .design-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .design-row .seg {
+    flex: 1;
+    flex-wrap: nowrap;
+  }
+  .design-row .seg button {
+    flex: 1;
+    min-height: 36px;
+    padding: 4px 2px;
+    white-space: nowrap;
+  }
+  .design-bar .done-btn {
+    min-height: 36px;
+    padding: 4px 12px;
+    white-space: nowrap;
+  }
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stepper button {
+    width: 36px;
+    min-height: 34px;
+    padding: 0;
+    font-size: 18px;
+  }
+  .stepper b {
+    min-width: 42px;
+    text-align: center;
+  }
+  .design-hint {
+    margin-left: auto;
+    text-align: right;
+  }
+  .design-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 2px 8px;
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    text-align: left;
+  }
+
   /* time bar */
   .mobile-nav {
     display: flex;

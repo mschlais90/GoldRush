@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { GRID_D, LAYER_M, cx, cy } from '../sim/geology/types';
 import { pitBlocksRemaining } from '../sim/mining';
+import { pitForecast } from '../sim/forecast';
 import { REGIONS } from '../sim/regions';
 import { money } from './format';
 import { MapCanvas, type Overlay, type Tool } from './map/MapCanvas';
@@ -15,7 +16,7 @@ import { store, useGame, useVersion } from './store';
 import { Reveal3D } from './view3d/Reveal3D';
 import { TutorialCoach, tutorialMarks, type RightTab, type TutorialUi } from './Tutorial';
 import { ConfirmBar, DrillOptions, describeTap } from './panels/ConfirmBar';
-import { Sheet, TimeBar, ToolStrip } from './panels/MobileHud';
+import { DesignBar, Sheet, TimeBar, ToolStrip, type DesignMode } from './panels/MobileHud';
 import { columnLabel } from '../sim/market';
 import { COSTS, geophysDone, walkAllDone } from '../sim/prospecting';
 import { useIsMobile } from './useIsMobile';
@@ -54,6 +55,10 @@ export function App() {
   const [sheet, setSheet] = useState<SheetId>(null);
   /** Phone: a whole-claim action (walk-all, IP survey) awaiting confirmation. */
   const [pendingAction, setPendingAction] = useState<{ text: string; run: () => void } | null>(null);
+  /** Phone pit/stope planning: one finger moves the map, digs, or erases. */
+  const [designMode, setDesignMode] = useState<DesignMode>('dig');
+  /** Show "Two fingers to move" until the player has found the Move button. */
+  const [moveHint, setMoveHint] = useState(true);
 
   // keyboard shortcuts for time
   useEffect(() => {
@@ -136,6 +141,7 @@ export function App() {
     setPendingAction(null);
     // picking a map tool from the Mine sheet: get the sheet out of the way so the map can be used
     if (mobile && t !== 'inspect') setSheet(null);
+    if (t === 'pit' || t === 'stope') setDesignMode('dig');
     if (t === 'pit') setOverlay('pit');
     if (t === 'stope') setOverlay('estimate');
   };
@@ -252,11 +258,12 @@ export function App() {
         onPaint={(c) =>
           tool === 'stope'
             ? store.dispatch({ type: 'setStopes', propId: p.id, cells: [c], zFrom: stopeRange[0], zTo: stopeRange[1] })
-            : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: pitDepth })
+            : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: mobile && designMode === 'erase' ? 0 : pitDepth })
         }
         onHover={setHover}
         onSelect={mobile ? setPending : undefined}
         pending={pending}
+        paintMode={mobile && designMode === 'move' ? 'move' : 'paint'}
         marks={tutorialMarks(s, tutUi)}
       />
     ) : (
@@ -373,6 +380,20 @@ export function App() {
   const moreTab: RightTab = tab === 'explore' ? 'mine' : tab;
   const tapText = p && pending !== null ? describeTap(tool, pending, trenchStart, drillDepth, rush) : null;
 
+  const designSummary = (() => {
+    if (!p || (tool !== 'pit' && tool !== 'stope')) return null;
+    if (tool === 'stope') return <>{p.mine.stopes.length} stope blocks queued</>;
+    const blocks = pitBlocksRemaining(p.mine);
+    const f = pitForecast(p, s.goldPrice);
+    if (!f || blocks === 0) return <>No pit planned yet</>;
+    return (
+      <>
+        {blocks} blocks ·{' '}
+        {Number.isFinite(f.days) ? <b className={f.profit >= 0 ? 'pos' : 'neg'}>profit {money(f.profit)}</b> : <span className="neg">needs equipment</span>}
+      </>
+    );
+  })();
+
   const phone = (
     <div className="hud">
       <div className="hud-chips">
@@ -407,7 +428,28 @@ export function App() {
           />
         )}
       </div>
-      {p && view === 'map' && (
+      {p && view === 'map' && (tool === 'pit' || tool === 'stope') && (
+        <DesignBar
+          tool={tool}
+          mode={designMode}
+          setMode={(m) => {
+            setDesignMode(m);
+            if (m === 'move') setMoveHint(false);
+          }}
+          hint={moveHint}
+          pitDepth={pitDepth}
+          setPitDepth={setPitDepth}
+          stopeRange={stopeRange}
+          setStopeRange={setStopeRange}
+          summary={designSummary}
+          onForecast={() => {
+            setTab('mine');
+            setSheet('more');
+          }}
+          onDone={() => selectTool('inspect')}
+        />
+      )}
+      {p && view === 'map' && tool !== 'pit' && tool !== 'stope' && (
         <ToolStrip
           tool={tool}
           setTool={selectTool}
@@ -524,7 +566,7 @@ export function App() {
     : setTab;
 
   return (
-    <div className={mobile ? 'app mobile-hud' : 'app'}>
+    <div className={mobile ? `app mobile-hud${p && view === 'map' && (tool === 'pit' || tool === 'stope') ? ' designing' : ''}` : 'app'}>
       <TopBar s={s} onQuit={() => store.quit()} />
       {mobile ? phone : desktop}
 

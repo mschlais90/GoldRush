@@ -8,6 +8,7 @@ import type { GameState, Property } from '../sim/state';
 import { suggestedPitCells, tutorialPlan, type TutorialPlan } from '../sim/tutorial';
 import type { Overlay } from './map/MapCanvas';
 import { store } from './store';
+import { isPhone } from './useIsMobile';
 
 export type RightTab = 'explore' | 'mine' | 'report' | 'bank' | 'awards';
 
@@ -148,6 +149,8 @@ const STEPS: Step[] = [
     title: 'Design the pit',
     body: (c) => {
       const floor = c.p ? suggestedPitCells(c.p).floor : 4;
+      if (isPhone())
+        return `Tap **Paint pit**, set the **floor to ${floor * LAYER_M} m** with **− / +** under the map, then drag across the **beacons** (the gold-coloured ground on your estimate). Tap **Move** to pan without digging. The walls slope automatically.`;
       return `Click **Paint pit**, set the **floor to ${floor * LAYER_M} m**, then click-drag across the **beacons** (the gold-coloured ground on your estimate). The walls slope automatically.`;
     },
     tab: 'mine',
