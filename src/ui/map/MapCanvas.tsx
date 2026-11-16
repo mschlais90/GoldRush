@@ -35,8 +35,6 @@ interface Props {
   pending?: number | null;
   /** Tutorial beacons: cells to point the player at. */
   marks?: number[];
-  /** Phone HUD: content laid over the bottom edge of the map (cell info). */
-  caption?: React.ReactNode;
 }
 
 /** Tools whose tap on touch acts immediately because they cost nothing. */
@@ -374,7 +372,6 @@ export function MapCanvas(p: Props) {
             </button>
           )}
         </div>
-        {p.caption}
       </div>
     </div>
   );

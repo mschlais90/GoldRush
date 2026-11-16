@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { modelKey } from '../../sim/economy';
 import { getModel } from '../../sim/estimate';
 import { CLUE_NAMES, GRID_D, LAYER_M, cx, cy, vi } from '../../sim/geology/types';
@@ -8,10 +7,11 @@ import type { GameState, Hole, Property } from '../../sim/state';
 import { getTruth } from '../../sim/truth';
 import { grade, gradeColor, money, rgb } from '../format';
 import { ClueIcon, type Overlay, type Tool } from '../map/MapCanvas';
+import { PanIcon } from '../icons';
 
 interface ToolDef {
   id: Tool;
-  name: string;
+  name: React.ReactNode;
   cost: string;
   desc: string;
 }
@@ -19,7 +19,13 @@ interface ToolDef {
 const TOOLS: ToolDef[] = [
   { id: 'inspect', name: '🔍 Inspect', cost: '', desc: 'Hover or tap a cell to see what it is and what you know. Click a drill hole for its core log.' },
   { id: 'walkover', name: '🥾 Walk-over', cost: `${money(COSTS.walkover.cost)} · ${COSTS.walkover.days}d`, desc: 'Geologist maps outcrops & surface clues in a radius.' },
-  { id: 'pan', name: '🥣 Pan creek', cost: `${money(COSTS.pan.cost)} · ${COSTS.pan.days}d`, desc: 'Count gold colors in stream gravel. Gold travels downstream: follow the trail up to its source.' },
+  {
+    id: 'pan',
+    name: (
+      <>
+        <PanIcon /> Pan creek
+      </>
+    ), cost: `${money(COSTS.pan.cost)} · ${COSTS.pan.days}d`, desc: 'Count gold colors in stream gravel. Gold travels downstream: follow the trail up to its source.' },
   { id: 'soil', name: '🧪 Soil grid', cost: `${money(COSTS.soil.cost)} · ${COSTS.soil.days}d + ${COSTS.soil.labDays}d lab`, desc: '49 soil samples on a grid. Picks up near-surface gold; deep cover masks it.' },
   { id: 'trench', name: '🚜 Trench', cost: `${money(COSTS.trench.costPerCell)}/cell · lab ${COSTS.trench.labDays}d`, desc: `Click start, then end (max ${COSTS.trench.maxLen} cells). Exact grades of the top ${COSTS.trench.layers * LAYER_M} m.` },
   { id: 'drill', name: '🛢 Core drill', cost: 'see below', desc: 'Exact grade every 5 m down the hole. Expensive, and deeper costs more.' },
@@ -105,7 +111,23 @@ export function ExplorePanel(props: Props) {
   );
 }
 
-export function CellInfo({ p, c, slice, compact, onOpenHole }: { p: Property; c: number | null; slice: number; compact?: boolean; onOpenHole?: (id: number) => void }) {
+export function CellInfo({
+  p,
+  c,
+  slice,
+  compact,
+  onOpenHole,
+  onExpand,
+}: {
+  p: Property;
+  c: number | null;
+  slice: number;
+  /** Phone HUD: a fixed two-line strip under the map instead of a panel. */
+  compact?: boolean;
+  onOpenHole?: (id: number) => void;
+  /** Compact only: tapping the strip opens the full details. */
+  onExpand?: () => void;
+}) {
   if (c === null)
     return compact ? (
       <div className="cell-caption muted small">Tap a cell to see what's there.</div>
@@ -157,7 +179,7 @@ export function CellInfo({ p, c, slice, compact, onOpenHole }: { p: Property; c:
   if (p.mine.target[c] > p.mine.mined[c]) rows.push(`Pit planned to ${p.mine.target[c] * LAYER_M} m`);
   if (compact) {
     const hole = k.holes.find((h) => h.c === c);
-    return <CellCaption label={columnLabel(c)} rows={rows} onOpenHole={hole && onOpenHole ? () => onOpenHole(hole.id) : undefined} />;
+    return <CellCaption label={columnLabel(c)} rows={rows} onExpand={onExpand} onOpenHole={hole && onOpenHole ? () => onOpenHole(hole.id) : undefined} />;
   }
   return (
     <div className="panel cellinfo">
@@ -171,17 +193,17 @@ export function CellInfo({ p, c, slice, compact, onOpenHole }: { p: Property; c:
   );
 }
 
-/** Phone HUD: cell info as a caption over the map's bottom edge. Two lines; tap to expand. */
-function CellCaption({ label, rows, onOpenHole }: { label: string; rows: React.ReactNode[]; onOpenHole?: () => void }) {
-  const [open, setOpen] = useState(false);
+/** Phone HUD: cell info as a fixed two-line strip under the map (so the map never changes size); tap for everything. */
+function CellCaption({ label, rows, onOpenHole, onExpand }: { label: string; rows: React.ReactNode[]; onOpenHole?: () => void; onExpand?: () => void }) {
   return (
-    <div className={`cell-caption small ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}>
+    <div className="cell-caption small" onClick={onExpand}>
       <div className="cell-caption-rows">
         <b>{label}</b>
         {rows.map((r, i) => (
           <span key={i}> · {r}</span>
         ))}
       </div>
+      {onExpand && !onOpenHole && <span className="cell-caption-more">›</span>}
       {onOpenHole && (
         <button
           className="small-btn"

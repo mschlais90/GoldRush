@@ -4,6 +4,7 @@ import { COSTS } from '../../sim/prospecting';
 import { money } from '../format';
 import type { Tool } from '../map/MapCanvas';
 import { store } from '../store';
+import { PanIcon } from '../icons';
 
 /** A panel that slides up over the map, stopping above the time bar so time stays usable. */
 export function Sheet({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -22,10 +23,10 @@ export function Sheet({ title, onClose, children }: { title: ReactNode; onClose:
   );
 }
 
-const STRIP: { id: Tool; icon: string; label: string; title: string }[] = [
+const STRIP: { id: Tool; icon: ReactNode; label: string; title: string }[] = [
   { id: 'inspect', icon: '🔍', label: 'Inspect', title: 'Tap a cell to see what it is' },
   { id: 'walkover', icon: '🥾', label: 'Walk', title: `Walk-over ${money(COSTS.walkover.cost)}` },
-  { id: 'pan', icon: '🥣', label: 'Pan', title: `Pan the creek ${money(COSTS.pan.cost)}` },
+  { id: 'pan', icon: <PanIcon />, label: 'Pan', title: `Pan the creek ${money(COSTS.pan.cost)}` },
   { id: 'soil', icon: '🧪', label: 'Soil', title: `Soil grid ${money(COSTS.soil.cost)}` },
   { id: 'trench', icon: '🚜', label: 'Trench', title: `Trench ${money(COSTS.trench.costPerCell)}/cell` },
   { id: 'drill', icon: '🛢', label: 'Drill', title: 'Core drill' },

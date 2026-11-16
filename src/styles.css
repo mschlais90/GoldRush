@@ -1080,17 +1080,20 @@ button.pulse {
     margin: 8px auto;
     overflow-y: auto;
   }
+  /* cell info: a fixed two-line strip under the map, so the map never jumps in size */
   .cell-caption {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    flex: none;
+    box-sizing: border-box;
+    height: 44px;
+    margin-top: 6px;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    background: rgba(11, 15, 26, 0.84);
-    border-top: 1px solid rgba(242, 193, 78, 0.25);
+    padding: 4px 10px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    line-height: 1.3;
   }
   .cell-caption-rows {
     flex: 1;
@@ -1100,8 +1103,9 @@ button.pulse {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .cell-caption.open .cell-caption-rows {
-    -webkit-line-clamp: unset;
+  .cell-caption-more {
+    color: var(--muted);
+    font-size: 20px;
   }
   .cell-caption canvas {
     vertical-align: -3px;

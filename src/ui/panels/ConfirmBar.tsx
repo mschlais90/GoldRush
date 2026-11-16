@@ -5,14 +5,19 @@ import { UNDERGROUND } from '../../sim/mining';
 import { COSTS, drillCost, drillDays, trenchCells } from '../../sim/prospecting';
 import { money } from '../format';
 import type { Tool } from '../map/MapCanvas';
+import { PanIcon } from '../icons';
 
 /** What a tap with `tool` on cell `c` will do and cost, or null when it's free. */
-export function describeTap(tool: Tool, c: number, trenchStart: number | null, drillDepth: number, rush: boolean): string | null {
+export function describeTap(tool: Tool, c: number, trenchStart: number | null, drillDepth: number, rush: boolean): ReactNode {
   switch (tool) {
     case 'walkover':
       return `🥾 Walk-over · ${money(COSTS.walkover.cost)} · ${COSTS.walkover.days}d`;
     case 'pan':
-      return `🥣 Pan here · ${money(COSTS.pan.cost)} · ${COSTS.pan.days}d`;
+      return (
+        <>
+          <PanIcon /> Pan here · {money(COSTS.pan.cost)} · {COSTS.pan.days}d
+        </>
+      );
     case 'soil':
       return `🧪 Soil grid · ${money(COSTS.soil.cost)} · ${COSTS.soil.days}d`;
     case 'trench': {
@@ -29,7 +34,7 @@ export function describeTap(tool: Tool, c: number, trenchStart: number | null, d
   }
 }
 
-export function ConfirmBar(p: { label?: string; text: string; onConfirm: () => void; onCancel: () => void; children?: ReactNode }) {
+export function ConfirmBar(p: { label?: string; text: ReactNode; onConfirm: () => void; onCancel: () => void; children?: ReactNode }) {
   return (
     <div className="confirm-bar">
       <div className="confirm-main">

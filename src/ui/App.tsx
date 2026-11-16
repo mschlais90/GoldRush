@@ -21,7 +21,7 @@ import { COSTS, geophysDone, walkAllDone } from '../sim/prospecting';
 import { useIsMobile } from './useIsMobile';
 
 /** Phone HUD sheets that slide up over the map. */
-type SheetId = 'claims' | 'layers' | 'more' | 'hole' | null;
+type SheetId = 'claims' | 'layers' | 'more' | 'hole' | 'cell' | null;
 const MORE_TABS: [RightTab, string][] = [
   ['mine', 'Mine'],
   ['report', 'Report'],
@@ -237,7 +237,7 @@ export function App() {
     </label>
   );
 
-  const mapOrModel = (caption?: React.ReactNode) =>
+  const mapOrModel = () =>
     p &&
     (view === 'map' ? (
       <MapCanvas
@@ -258,7 +258,6 @@ export function App() {
         onSelect={mobile ? setPending : undefined}
         pending={pending}
         marks={tutorialMarks(s, tutUi)}
-        caption={caption}
       />
     ) : (
       <Reveal3D prop={p} version={version} cutoff={p.mine.cutoff} showShell={showShell} xray={xray} showTruth={showTruth && !!s.gameOver} />
@@ -392,20 +391,21 @@ export function App() {
         )}
       </div>
       <div className="hud-map">
-        {p
-          ? mapOrModel(
-              <CellInfo
-                p={p}
-                c={hover}
-                slice={slice}
-                compact
-                onOpenHole={(id) => {
-                  setHoleId(id);
-                  setSheet('hole');
-                }}
-              />,
-            )
-          : welcome}
+        {p ? mapOrModel() : welcome}
+        {/* cell info sits under the map rather than over it, at a fixed height so the map never resizes */}
+        {p && view === 'map' && (
+          <CellInfo
+            p={p}
+            c={hover}
+            slice={slice}
+            compact
+            onExpand={hover !== null ? () => setSheet('cell') : undefined}
+            onOpenHole={(id) => {
+              setHoleId(id);
+              setSheet('hole');
+            }}
+          />
+        )}
       </div>
       {p && view === 'map' && (
         <ToolStrip
@@ -466,6 +466,21 @@ export function App() {
               }}
             />
           )}
+        </Sheet>
+      )}
+      {sheet === 'cell' && p && hover !== null && (
+        <Sheet title={`Cell ${columnLabel(hover)}`} onClose={() => setSheet(null)}>
+          <CellInfo p={p} c={hover} slice={slice} />
+          {(() => {
+            const h = p.knowledge.holes.find((hh) => hh.c === hover);
+            return (
+              h && (
+                <div className="panel">
+                  <CoreLog p={p} hole={h} />
+                </div>
+              )
+            );
+          })()}
         </Sheet>
       )}
       {sheet === 'hole' && p && hole && (
