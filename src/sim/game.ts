@@ -332,6 +332,9 @@ export function applyCommand(s: GameState, cmd: Command): CommandResult {
       const p = prop(s, cmd.propId);
       if (!p) return fail('No such property.');
       if (!inBounds(cmd.x, cmd.y)) return fail('Out of bounds.');
+      // re-drilling a collar is always a mis-tap: the existing core already covers that column
+      const existing = p.knowledge.holes.find((h) => h.c === ci(cmd.x, cmd.y));
+      if (existing) return fail(`${existing.name} is already drilled here. Pick another cell.`);
       const depth = Math.max(1, Math.min(GRID_D, Math.round(cmd.depth)));
       const cost = drillCost(depth, cmd.rush);
       if (!spend(s, p, cost, 'explore')) return fail('Not enough cash.');

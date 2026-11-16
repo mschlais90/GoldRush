@@ -97,6 +97,22 @@ export function App() {
     if (mobile) setSheet(null);
   };
 
+  /** Show a hole's core log: the hole sheet on phones, the Explore tab on desktop. */
+  const openHole = (id: number) => {
+    setHoleId(id);
+    if (mobile) setSheet('hole');
+    else setTab('explore');
+  };
+
+  /** Phone tap with a paid tool: wait for confirmation, except on an existing hole with the drill (never re-drilled). */
+  const selectCell = (c: number) => {
+    const h = tool === 'drill' ? p?.knowledge.holes.find((hh) => hh.c === c) : undefined;
+    if (h) {
+      setPending(null);
+      onCellClick(c);
+    } else setPending(c);
+  };
+
   const onCellClick = (c: number) => {
     if (!p) return;
     const x = cx(c);
@@ -105,6 +121,7 @@ export function App() {
       case 'inspect': {
         const h = p.knowledge.holes.find((hh) => hh.c === c);
         setHoleId(h ? h.id : null);
+        if (h) openHole(h.id);
         break;
       }
       case 'walkover':
@@ -127,6 +144,13 @@ export function App() {
         if (store.dispatch({ type: 'placeShaft', propId: p.id, x, y }).ok) setTool('inspect');
         break;
       case 'drill': {
+        const h = p.knowledge.holes.find((hh) => hh.c === c);
+        if (h) {
+          // already drilled: the sim refuses (with a toast); show that hole's log instead
+          store.dispatch({ type: 'drill', propId: p.id, x, y, depth: drillDepth, rush });
+          openHole(h.id);
+          break;
+        }
         const r = store.dispatch({ type: 'drill', propId: p.id, x, y, depth: drillDepth, rush });
         if (r.ok) setHoleId(p.knowledge.holes[p.knowledge.holes.length - 1].id);
         break;
@@ -261,7 +285,7 @@ export function App() {
             : store.dispatch({ type: 'setPit', propId: p.id, cells: [c], depth: mobile && designMode === 'erase' ? 0 : pitDepth })
         }
         onHover={setHover}
-        onSelect={mobile ? setPending : undefined}
+        onSelect={mobile ? selectCell : undefined}
         pending={pending}
         paintMode={mobile && designMode === 'move' ? 'move' : 'paint'}
         marks={tutorialMarks(s, tutUi)}

@@ -57,6 +57,22 @@ describe('reducer', () => {
     }
   });
 
+  it('refuses to re-drill a cell that already has a hole, without charging', () => {
+    const s = newGame(7);
+    applyCommand(s, { type: 'buyListing', listingId: s.listings[0].id });
+    const p = s.properties[0];
+    s.cash = 1_000_000;
+    const busy = new Set(p.knowledge.holes.map((h) => h.c));
+    let x = 0;
+    while (busy.has(x)) x++; // first free cell on row 0
+    expect(applyCommand(s, { type: 'drill', propId: p.id, x, y: 0, depth: 8, rush: false }).ok).toBe(true);
+    const cash = s.cash;
+    const holes = p.knowledge.holes.length;
+    expect(applyCommand(s, { type: 'drill', propId: p.id, x, y: 0, depth: 12, rush: true }).ok).toBe(false);
+    expect(s.cash).toBe(cash);
+    expect(p.knowledge.holes.length).toBe(holes);
+  });
+
   it('rejects spending money you do not have', () => {
     const s = newGame(3);
     s.cash = 10;
